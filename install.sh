@@ -240,7 +240,7 @@ show_summary() {
     printf "  ${_W}Install dir${_RESET}      %s\n" "$INSTALL_DIR"
     printf "  ${_W}Listen address${_RESET}   %s${_C}:${_RESET}%s\n" "$BIND_ADDR" "$PORT"
     printf "  ${_W}Log level${_RESET}        %s\n" "$LOG_LEVEL"
-    printf "  ${_W}Service user${_RESET}     %s\n" "$APP_NAME"
+    printf "  ${_W}Service user${_RESET}     root\n"
     printf "  ${_W}Systemd unit${_RESET}     %s\n" "$SERVICE_FILE"
     printf "  ${_W}Database${_RESET}         %s/scanner.db\n" "$INSTALL_DIR"
     echo ""
@@ -289,21 +289,11 @@ do_install() {
     # --- show summary and confirm ---
     show_summary "$binary_path" "$auto_yes"
 
-    # --- create system user ---
-    step "Creating system user"
-    if id "${APP_NAME}" &>/dev/null; then
-        ok "System user '${APP_NAME}' already exists — skipping."
-    else
-        useradd --system --no-create-home --shell /usr/sbin/nologin "${APP_NAME}"
-        ok "Created system user '${APP_NAME}'."
-    fi
-
     # --- install binary ---
     step "Installing binary"
     mkdir -p "${INSTALL_DIR}"
     cp -f "${binary_path}" "${INSTALL_DIR}/${APP_NAME}"
     chmod 755 "${INSTALL_DIR}/${APP_NAME}"
-    chown -R "${APP_NAME}:${APP_NAME}" "${INSTALL_DIR}"
     ok "Binary installed to ${INSTALL_DIR}/${APP_NAME}"
 
     # --- write systemd service ---
@@ -315,8 +305,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=${APP_NAME}
-Group=${APP_NAME}
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=${INSTALL_DIR}/${APP_NAME}
 Environment=LISTEN_ADDR=${BIND_ADDR}:${PORT}
@@ -440,20 +428,6 @@ do_uninstall() {
         else
             info "Directory ${install_dir} kept. You can remove it later with:"
             dim "    sudo rm -rf ${install_dir}"
-        fi
-    fi
-
-    # --- remove user ---
-    if id "${APP_NAME}" &>/dev/null; then
-        echo ""
-        printf "  ${_W}›${_RESET} Remove system user '${_Y}${APP_NAME}${_RESET}'? ${_D}[y/N]${_RESET}: "
-        local answer2
-        read -r answer2
-        if [[ "${answer2,,}" == "y" || "${answer2,,}" == "yes" ]]; then
-            userdel "${APP_NAME}"
-            ok "User '${APP_NAME}' removed."
-        else
-            info "User '${APP_NAME}' kept."
         fi
     fi
 
