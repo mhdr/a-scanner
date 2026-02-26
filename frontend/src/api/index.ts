@@ -1,5 +1,7 @@
 export {
-  listScans, createScan, getScan, getScanResults, listResults, listProviders,
+  listScans, createScan, getScan, getScanResults, listResults,
+  listAggregatedIps, getIpResults, deleteAllResults,
+  listProviders,
   getProvider, createProvider, updateProvider, deleteProvider,
   getProviderRanges, fetchProviderRanges, createProviderRange,
   updateProviderRange, deleteProviderRange, bulkToggleRanges,

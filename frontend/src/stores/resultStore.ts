@@ -1,50 +1,60 @@
 import { create } from 'zustand';
-import type { ScanResult } from '../types';
-import { listResults, deleteAllResults as apiDeleteAllResults } from '../api';
+import type { AggregatedIpResult, ScanResult } from '../types';
+import {
+  listAggregatedIps,
+  getIpResults,
+  deleteAllResults as apiDeleteAllResults,
+} from '../api';
 
 interface ResultState {
-  results: ScanResult[];
-  total: number;
-  page: number;
-  pageSize: number;
+  // Aggregated IPs (main results tab)
+  aggregatedIps: AggregatedIpResult[];
+  aggregatedTotal: number;
+  aggregatedPage: number;
+  aggregatedPageSize: number;
   isLoading: boolean;
   error: string | null;
-  reachableOnly: boolean;
-  setReachableOnly: (value: boolean) => void;
-  setPagination: (page: number, pageSize: number) => void;
-  fetchResults: () => Promise<void>;
+  setAggregatedPagination: (page: number, pageSize: number) => void;
+  fetchAggregatedIps: () => Promise<void>;
   deleteAllResults: () => Promise<void>;
+
+  // IP detail page
+  currentIp: string | null;
+  ipResults: ScanResult[];
+  ipResultsTotal: number;
+  ipResultsPage: number;
+  ipResultsPageSize: number;
+  isIpResultsLoading: boolean;
+  ipChartData: ScanResult[];
+  isChartLoading: boolean;
+  setIpResultsPagination: (page: number, pageSize: number) => void;
+  fetchIpResults: (ip: string) => Promise<void>;
+  fetchIpChartData: (ip: string) => Promise<void>;
 }
 
 export const useResultStore = create<ResultState>((set, get) => ({
-  results: [],
-  total: 0,
-  page: 0,
-  pageSize: 25,
+  // Aggregated IPs
+  aggregatedIps: [],
+  aggregatedTotal: 0,
+  aggregatedPage: 0,
+  aggregatedPageSize: 25,
   isLoading: false,
   error: null,
-  reachableOnly: true,
 
-  setReachableOnly: (value: boolean) => {
-    set({ reachableOnly: value, page: 0 });
+  setAggregatedPagination: (page: number, pageSize: number) => {
+    set({ aggregatedPage: page, aggregatedPageSize: pageSize });
   },
 
-  setPagination: (page: number, pageSize: number) => {
-    set({ page, pageSize });
-  },
-
-  fetchResults: async () => {
-    const { page, pageSize, reachableOnly, results } = get();
-    // Only show loading indicator when there's no existing data (initial load)
-    if (results.length === 0) set({ isLoading: true });
+  fetchAggregatedIps: async () => {
+    const { aggregatedPage, aggregatedPageSize, aggregatedIps } = get();
+    if (aggregatedIps.length === 0) set({ isLoading: true });
     set({ error: null });
     try {
-      const resp = await listResults({
-        reachable_only: reachableOnly,
-        page: page + 1, // backend is 1-indexed
-        per_page: pageSize,
+      const resp = await listAggregatedIps({
+        page: aggregatedPage + 1, // backend is 1-indexed
+        per_page: aggregatedPageSize,
       });
-      set({ results: resp.data, total: resp.total, isLoading: false });
+      set({ aggregatedIps: resp.data, aggregatedTotal: resp.total, isLoading: false });
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
     }
@@ -54,11 +64,50 @@ export const useResultStore = create<ResultState>((set, get) => ({
     set({ error: null });
     try {
       await apiDeleteAllResults();
-      set({ results: [], total: 0, page: 0 });
-      // Re-fetch to reflect any remaining results (from running scans)
-      await get().fetchResults();
+      set({ aggregatedIps: [], aggregatedTotal: 0, aggregatedPage: 0 });
+      await get().fetchAggregatedIps();
     } catch (err) {
       set({ error: (err as Error).message });
+    }
+  },
+
+  // IP detail
+  currentIp: null,
+  ipResults: [],
+  ipResultsTotal: 0,
+  ipResultsPage: 0,
+  ipResultsPageSize: 25,
+  isIpResultsLoading: false,
+  ipChartData: [],
+  isChartLoading: false,
+
+  setIpResultsPagination: (page: number, pageSize: number) => {
+    set({ ipResultsPage: page, ipResultsPageSize: pageSize });
+  },
+
+  fetchIpResults: async (ip: string) => {
+    const { ipResultsPage, ipResultsPageSize, ipResults } = get();
+    if (ipResults.length === 0) set({ isIpResultsLoading: true });
+    set({ error: null, currentIp: ip });
+    try {
+      const resp = await getIpResults(ip, {
+        page: ipResultsPage + 1,
+        per_page: ipResultsPageSize,
+      });
+      set({ ipResults: resp.data, ipResultsTotal: resp.total, isIpResultsLoading: false });
+    } catch (err) {
+      set({ error: (err as Error).message, isIpResultsLoading: false });
+    }
+  },
+
+  fetchIpChartData: async (ip: string) => {
+    set({ isChartLoading: true, error: null });
+    try {
+      const resp = await getIpResults(ip, { page: 1, per_page: 1000 });
+      // Reverse so oldest first for chronological charts
+      set({ ipChartData: resp.data.reverse(), isChartLoading: false });
+    } catch (err) {
+      set({ error: (err as Error).message, isChartLoading: false });
     }
   },
 }));

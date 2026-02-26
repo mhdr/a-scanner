@@ -68,6 +68,21 @@ pub struct Scan {
     pub extended: bool,
 }
 
+/// Aggregated scan result per unique IP address.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AggregatedIpResult {
+    pub ip: String,
+    pub avg_latency_ms: Option<f64>,
+    pub avg_tls_latency_ms: Option<f64>,
+    pub avg_ttfb_ms: Option<f64>,
+    pub avg_download_speed_kbps: Option<f64>,
+    pub avg_jitter_ms: Option<f64>,
+    pub avg_packet_loss: Option<f64>,
+    pub avg_score: Option<f64>,
+    pub scan_count: i64,
+    pub last_seen: String,
+}
+
 /// A single scan result row from the database.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ScanResult {

@@ -1,4 +1,5 @@
 import type {
+  AggregatedIpResult,
   AuthUser,
   ChangePasswordRequest,
   CreateProviderRequest,
@@ -113,6 +114,19 @@ export async function listResults(params?: ResultFilterParams): Promise<Paginate
 
 export async function deleteAllResults(): Promise<void> {
   await request('/api/v1/results', { method: 'DELETE' });
+}
+
+export async function listAggregatedIps(
+  params?: PaginationParams & { provider?: string },
+): Promise<PaginatedResponse<AggregatedIpResult>> {
+  return request(`/api/v1/results/ips${toQuery((params ?? {}) as Record<string, unknown>)}`);
+}
+
+export async function getIpResults(
+  ip: string,
+  params?: PaginationParams,
+): Promise<PaginatedResponse<ScanResult>> {
+  return request(`/api/v1/results/ips/${encodeURIComponent(ip)}${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 
 // --- Providers ---

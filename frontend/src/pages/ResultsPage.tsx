@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -9,102 +10,99 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  FormControlLabel,
-  Switch,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
 import { useResultStore } from '../stores/resultStore';
 
 const columns: GridColDef[] = [
   { field: 'ip', headerName: 'IP Address', width: 180 },
   {
-    field: 'is_reachable',
-    headerName: 'Reachable',
-    width: 100,
+    field: 'avg_latency_ms',
+    headerName: 'Avg TCP (ms)',
+    width: 120,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${(params.value as number).toFixed(0)}` : '—'),
+  },
+  {
+    field: 'avg_tls_latency_ms',
+    headerName: 'Avg TLS (ms)',
+    width: 120,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${(params.value as number).toFixed(0)}` : '—'),
+  },
+  {
+    field: 'avg_ttfb_ms',
+    headerName: 'Avg TTFB (ms)',
+    width: 130,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${(params.value as number).toFixed(0)}` : '—'),
+  },
+  {
+    field: 'avg_download_speed_kbps',
+    headerName: 'Avg Speed (KB/s)',
+    width: 140,
+    type: 'number',
     renderCell: (params) =>
-      params.value ? (
-        <CheckCircleIcon color="success" />
-      ) : (
-        <CancelIcon color="error" />
-      ),
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
   },
   {
-    field: 'latency_ms',
-    headerName: 'TCP (ms)',
-    width: 100,
+    field: 'avg_jitter_ms',
+    headerName: 'Avg Jitter (ms)',
+    width: 130,
     type: 'number',
-    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
   },
   {
-    field: 'tls_latency_ms',
-    headerName: 'TLS (ms)',
-    width: 100,
-    type: 'number',
-    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
-  },
-  {
-    field: 'ttfb_ms',
-    headerName: 'TTFB (ms)',
-    width: 100,
-    type: 'number',
-    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
-  },
-  {
-    field: 'download_speed_kbps',
-    headerName: 'Speed (KB/s)',
+    field: 'avg_packet_loss',
+    headerName: 'Avg Loss (%)',
     width: 120,
     type: 'number',
     renderCell: (params) =>
       params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
   },
   {
-    field: 'jitter_ms',
-    headerName: 'Jitter (ms)',
-    width: 100,
-    type: 'number',
-    renderCell: (params) =>
-      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
-  },
-  {
-    field: 'packet_loss',
-    headerName: 'Loss (%)',
-    width: 100,
-    type: 'number',
-    renderCell: (params) =>
-      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
-  },
-  {
-    field: 'score',
-    headerName: 'Score',
-    width: 100,
+    field: 'avg_score',
+    headerName: 'Avg Score',
+    width: 110,
     type: 'number',
     renderCell: (params) =>
       params.value != null ? `${(params.value as number).toFixed(0)}` : '—',
   },
-  { field: 'scan_id', headerName: 'Scan ID', width: 280 },
+  {
+    field: 'scan_count',
+    headerName: 'Scans',
+    width: 80,
+    type: 'number',
+  },
+  {
+    field: 'last_seen',
+    headerName: 'Last Seen',
+    width: 180,
+  },
 ];
 
 /** Columns hidden on mobile */
 const mobileColumnVisibility: Record<string, boolean> = {
-  tls_latency_ms: false,
-  download_speed_kbps: false,
-  jitter_ms: false,
-  packet_loss: false,
-  scan_id: false,
+  avg_tls_latency_ms: false,
+  avg_download_speed_kbps: false,
+  avg_jitter_ms: false,
+  avg_packet_loss: false,
+  scan_count: false,
+  last_seen: false,
 };
 
 export default function ResultsPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const navigate = useNavigate();
   const {
-    results, total, page, pageSize, isLoading, error,
-    reachableOnly, setReachableOnly, setPagination, fetchResults,
+    aggregatedIps, aggregatedTotal, aggregatedPage, aggregatedPageSize,
+    isLoading, error, setAggregatedPagination, fetchAggregatedIps,
     deleteAllResults,
   } = useResultStore();
 
@@ -119,8 +117,8 @@ export default function ResultsPage() {
   };
 
   useEffect(() => {
-    fetchResults();
-  }, [fetchResults, reachableOnly, page, pageSize]);
+    fetchAggregatedIps();
+  }, [fetchAggregatedIps, aggregatedPage, aggregatedPageSize]);
 
   return (
     <Box>
@@ -136,24 +134,13 @@ export default function ResultsPage() {
 
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={reachableOnly}
-                  onChange={(e) => {
-                    setReachableOnly(e.target.checked);
-                  }}
-                />
-              }
-              label="Show reachable only"
-            />
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 2 }}>
             <Button
               variant="outlined"
               color="error"
               startIcon={<DeleteSweepIcon />}
               onClick={() => setConfirmOpen(true)}
-              disabled={deleting || total === 0}
+              disabled={deleting || aggregatedTotal === 0}
               size={isMobile ? 'small' : 'medium'}
             >
               Delete All
@@ -178,20 +165,30 @@ export default function ResultsPage() {
             </DialogActions>
           </Dialog>
           <DataGrid
-            rows={results}
+            rows={aggregatedIps}
             columns={columns}
+            getRowId={(row) => row.ip}
             paginationMode="server"
-            rowCount={total}
-            paginationModel={{ page, pageSize }}
+            rowCount={aggregatedTotal}
+            paginationModel={{ page: aggregatedPage, pageSize: aggregatedPageSize }}
             onPaginationModelChange={(model: GridPaginationModel) => {
-              setPagination(model.page, model.pageSize);
+              setAggregatedPagination(model.page, model.pageSize);
             }}
             pageSizeOptions={[10, 25, 50, 100]}
             sortingMode="server"
+            initialState={{
+              sorting: { sortModel: [{ field: 'avg_score', sort: 'asc' }] },
+            }}
             loading={isLoading}
             columnVisibilityModel={isMobile ? mobileColumnVisibility : undefined}
             autoHeight
             disableRowSelectionOnClick
+            onRowClick={(params) => {
+              navigate(`/results/${encodeURIComponent(params.row.ip)}`);
+            }}
+            sx={{
+              '& .MuiDataGrid-row': { cursor: 'pointer' },
+            }}
           />
         </CardContent>
       </Card>

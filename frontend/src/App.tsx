@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import ScansPage from './pages/ScansPage';
 import ScanDetailPage from './pages/ScanDetailPage';
 import ResultsPage from './pages/ResultsPage';
+import IpDetailPage from './pages/IpDetailPage';
 import ProvidersPage from './pages/ProvidersPage';
 import LoginPage from './pages/LoginPage';
 import { useAuthStore } from './stores/authStore';
@@ -41,6 +42,7 @@ function App() {
                   <Route path="/scans" element={<ScansPage />} />
                   <Route path="/scans/:id" element={<ScanDetailPage />} />
                   <Route path="/providers" element={<ProvidersPage />} />
+                  <Route path="/results/:ip" element={<IpDetailPage />} />
                   <Route path="/results" element={<ResultsPage />} />
                 </Routes>
               </Layout>

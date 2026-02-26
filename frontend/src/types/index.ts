@@ -92,6 +92,20 @@ export interface ResultFilterParams extends PaginationParams {
   provider?: string;
 }
 
+/// Aggregated (deduplicated) result per unique reachable IP.
+export interface AggregatedIpResult {
+  ip: string;
+  avg_latency_ms: number | null;
+  avg_tls_latency_ms: number | null;
+  avg_ttfb_ms: number | null;
+  avg_download_speed_kbps: number | null;
+  avg_jitter_ms: number | null;
+  avg_packet_loss: number | null;
+  avg_score: number | null;
+  scan_count: number;
+  last_seen: string;
+}
+
 /// API error response.
 export interface ApiError {
   error: string;
