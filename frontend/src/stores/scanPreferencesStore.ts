@@ -41,7 +41,7 @@ export const useScanPreferencesStore = create<ScanPreferencesState>()(
       selectedProvider: 'cloudflare',
       extended: false,
       showAdvanced: false,
-      concurrency: 64,
+      concurrency: 3000,
       timeoutMs: 2000,
       port: 443,
       samples: 3,

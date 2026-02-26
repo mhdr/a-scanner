@@ -55,7 +55,7 @@ async fn create_scan(
     // Build scan config from request
     let config = ScanConfig {
         provider_id: body.provider.clone(),
-        concurrency: body.concurrency.unwrap_or(64) as usize,
+        concurrency: body.concurrency.unwrap_or(3000) as usize,
         timeout_ms: body.timeout_ms.unwrap_or(2000) as u64,
         port: body.port.unwrap_or(443) as u16,
         extended: body.extended,

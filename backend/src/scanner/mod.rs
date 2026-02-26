@@ -42,7 +42,7 @@ impl Default for ScanConfig {
     fn default() -> Self {
         Self {
             provider_id: "cloudflare".to_string(),
-            concurrency: 64,
+            concurrency: 3000,
             timeout_ms: 2000,
             port: 443,
             extended: false,
