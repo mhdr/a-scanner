@@ -198,7 +198,10 @@ export default function ScanDetailPage() {
             rows={currentResults}
             columns={columns}
             pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 25 } },
+              sorting: { sortModel: [{ field: isExtended ? 'score' : 'latency_ms', sort: 'asc' }] },
+            }}
             loading={isLoading}
             autoHeight
             disableRowSelectionOnClick

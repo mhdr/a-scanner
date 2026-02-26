@@ -111,7 +111,10 @@ export default function ResultsPage() {
             rows={results}
             columns={columns}
             pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 25 } },
+              sorting: { sortModel: [{ field: 'score', sort: 'asc' }] },
+            }}
             loading={isLoading}
             autoHeight
             disableRowSelectionOnClick
