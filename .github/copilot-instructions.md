@@ -96,6 +96,20 @@ a-scanner/
 
 ## Frontend Guidelines
 
+### Responsive Design (Desktop & Mobile)
+
+- The app must work well on both **desktop browsers** and **mobile devices**.
+- Use MUI's responsive utilities (`useMediaQuery`, `useTheme`, breakpoints in `sx` prop) to adapt layouts.
+- Use MUI's breakpoint system (`xs`, `sm`, `md`, `lg`, `xl`) in `sx` and `Grid` for responsive sizing.
+- Design mobile-first: start with the small-screen layout, then enhance for larger screens.
+- Ensure touch-friendly tap targets (minimum 48×48px for interactive elements).
+- Use responsive typography — MUI's `theme.typography` with `responsiveFontSizes()` where appropriate.
+- Avoid fixed widths that break on narrow viewports; prefer relative units (`%`, `vw`) and `maxWidth`.
+- Test layouts at common breakpoints: 360px (mobile), 768px (tablet), 1024px+ (desktop).
+- Use MUI `<Drawer>` (temporary variant) for mobile navigation instead of persistent sidebars.
+- Use `<Dialog fullScreen>` on mobile for complex forms or detail views when appropriate.
+- Data tables (`<DataGrid>`) should use fewer visible columns on mobile; hide non-essential columns via responsive `columnVisibilityModel` or switch to a card/list layout on small screens.
+
 ### React + TypeScript
 
 - Use functional components with hooks exclusively — no class components.
