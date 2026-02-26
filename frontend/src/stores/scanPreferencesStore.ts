@@ -44,7 +44,7 @@ export const useScanPreferencesStore = create<ScanPreferencesState>()(
       concurrency: 3000,
       timeoutMs: 2000,
       port: 443,
-      samples: 3,
+      samples: 10,
       extendedConcurrency: 200,
       extendedTimeoutMs: 10000,
       packetLossProbes: 10,
