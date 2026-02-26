@@ -1,11 +1,18 @@
 use sqlx::SqlitePool;
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use std::str::FromStr;
 
 /// Initialize the SQLite database connection pool and run migrations.
 pub async fn init_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
+    let options = SqliteConnectOptions::from_str(database_url)?
+        .journal_mode(SqliteJournalMode::Wal)
+        .synchronous(SqliteSynchronous::Normal)
+        .busy_timeout(std::time::Duration::from_secs(30))
+        .pragma("wal_autocheckpoint", "1000");
+
     let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(database_url)
+        .max_connections(10)
+        .connect_with(options)
         .await?;
 
     // Run embedded migrations
