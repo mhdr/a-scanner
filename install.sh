@@ -188,6 +188,74 @@ validate_bind_addr() {
     fi
 }
 
+# ---------- saved configuration ----------
+
+# Config file path — resolved after we know the install directory
+CONFIG_FILENAME="config.json"
+
+# Load previously saved configuration from the install directory.
+# Detection order: systemd service file → default install dir.
+load_saved_config() {
+    local config_dir=""
+
+    # Try to detect install dir from the existing systemd service file
+    if [[ -f "${SERVICE_FILE}" ]]; then
+        local detected_dir
+        detected_dir=$(grep -oP 'WorkingDirectory=\K.*' "${SERVICE_FILE}" 2>/dev/null || true)
+        if [[ -n "$detected_dir" ]]; then
+            config_dir="$detected_dir"
+        fi
+    fi
+
+    # Fall back to default install dir
+    if [[ -z "$config_dir" ]]; then
+        config_dir="${DEFAULT_INSTALL_DIR}"
+    fi
+
+    local config_file="${config_dir}/${CONFIG_FILENAME}"
+
+    if [[ ! -f "$config_file" ]]; then
+        return
+    fi
+
+    # Parse simple flat JSON with grep+sed (no jq dependency)
+    local val
+
+    val=$(grep '"port"' "$config_file" 2>/dev/null | sed 's/[^0-9]//g' || true)
+    if [[ -n "$val" ]]; then
+        DEFAULT_PORT="$val"
+    fi
+
+    val=$(grep '"install_dir"' "$config_file" 2>/dev/null | sed 's/.*"install_dir"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+    if [[ -n "$val" ]]; then
+        DEFAULT_INSTALL_DIR="$val"
+    fi
+
+    val=$(grep '"bind_addr"' "$config_file" 2>/dev/null | sed 's/.*"bind_addr"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+    if [[ -n "$val" ]]; then
+        DEFAULT_BIND_ADDR="$val"
+    fi
+
+    val=$(grep '"log_level"' "$config_file" 2>/dev/null | sed 's/.*"log_level"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+    if [[ -n "$val" ]]; then
+        DEFAULT_LOG_LEVEL="$val"
+    fi
+
+    info "Loaded previous configuration from ${config_file}"
+}
+
+# Save the current configuration to JSON in the install directory.
+save_config() {
+    cat > "${INSTALL_DIR}/${CONFIG_FILENAME}" <<CONF
+{
+  "port": ${PORT},
+  "install_dir": "${INSTALL_DIR}",
+  "bind_addr": "${BIND_ADDR}",
+  "log_level": "${LOG_LEVEL}"
+}
+CONF
+}
+
 # ---------- interactive configuration ----------
 
 interactive_config() {
@@ -295,6 +363,10 @@ do_install() {
     cp -f "${binary_path}" "${INSTALL_DIR}/${APP_NAME}"
     chmod 755 "${INSTALL_DIR}/${APP_NAME}"
     ok "Binary installed to ${INSTALL_DIR}/${APP_NAME}"
+
+    # --- save configuration ---
+    save_config
+    ok "Configuration saved to ${INSTALL_DIR}/${CONFIG_FILENAME}"
 
     # --- write systemd service ---
     step "Configuring systemd service"
@@ -469,6 +541,10 @@ main() {
     local action=""
     local auto_yes="false"
     local action_from_cli="false"
+
+    # Load saved config from previous install (if any).
+    # This updates DEFAULT_* vars so they reflect the last-used values.
+    load_saved_config
 
     # Mutable config — set from defaults, overridable by flags, then by prompts
     PORT="${DEFAULT_PORT}"
