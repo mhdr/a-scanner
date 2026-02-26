@@ -373,6 +373,9 @@ function ProviderDetail({ provider }: ProviderDetailProps) {
                 <strong>Source URLs:</strong> {parsedUrls.length}
               </Typography>
             )}
+            <Typography variant="body2" color="text.secondary">
+              <strong>Format:</strong> {provider.response_format === 'json' ? 'JSON' : 'Plain text'}
+            </Typography>
           </Stack>
         </Box>
       </Stack>

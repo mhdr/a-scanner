@@ -16,7 +16,7 @@ use crate::scanner::provider::{fetch_cidr_list, get_provider_from_db};
 /// List all providers.
 pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, AppError> {
     let providers = sqlx::query_as::<_, Provider>(
-        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers ORDER BY name",
     )
     .fetch_all(db)
@@ -27,7 +27,7 @@ pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, AppError> 
 /// Get a single provider by ID.
 pub async fn get_provider_by_id(db: &SqlitePool, id: &str) -> Result<Provider, AppError> {
     sqlx::query_as::<_, Provider>(
-        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers WHERE id = ?",
     )
     .bind(id)
@@ -48,8 +48,8 @@ pub async fn create_provider(
         .map_err(|e| AppError::BadRequest(format!("Invalid ip_range_urls: {e}")))?;
 
     sqlx::query(
-        "INSERT INTO providers (id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+        "INSERT INTO providers (id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 0, 'text', ?, ?)",
     )
     .bind(&id)
     .bind(&req.name)
@@ -195,8 +195,9 @@ pub async fn fetch_and_store_ranges(
     let provider = get_provider_from_db(db, provider_id).await?;
 
     let mut all_cidrs: Vec<(String, i64)> = Vec::new();
+    let format = provider.response_format();
     for url in provider.ip_range_urls() {
-        let nets = fetch_cidr_list(url)
+        let nets = fetch_cidr_list(url, format)
             .await
             .map_err(|e| AppError::Internal(e))?;
         for net in &nets {

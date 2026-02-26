@@ -76,6 +76,8 @@ pub struct Provider {
     /// JSON array of upstream URL strings, e.g. `["https://..."]`.
     pub ip_range_urls: String,
     pub is_builtin: bool,
+    /// Response format for upstream IP range URLs: `"text"` (one CIDR per line) or `"json"` (JSON with addresses arrays).
+    pub response_format: String,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -112,6 +112,10 @@ pub trait CdnProvider: Send + Sync {
 
     /// URLs to fetch CIDR range lists from.
     fn ip_range_urls(&self) -> Vec<&str>;
+
+    /// Response format for the upstream IP range URLs.
+    /// `"text"` = one CIDR per line, `"json"` = JSON with addresses arrays.
+    fn response_format(&self) -> &str;
 }
 
 /// Create a TLS connector with webpki root certificates.

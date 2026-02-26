@@ -6,9 +6,35 @@ use sqlx::SqlitePool;
 use super::CdnProvider;
 use crate::error::AppError;
 
-/// Fetch a URL and parse each non-empty, non-comment line as an IpNet CIDR range.
-pub(crate) async fn fetch_cidr_list(url: &str) -> anyhow::Result<Vec<IpNet>> {
+/// Fetch a URL and parse CIDR ranges from the response.
+///
+/// The `format` parameter controls parsing:
+/// - `"text"` — plain text, one CIDR per line (e.g. Cloudflare).
+/// - `"json"` — JSON object with `"addresses"` and/or `"addresses_v6"` arrays (e.g. Gcore).
+pub(crate) async fn fetch_cidr_list(url: &str, format: &str) -> anyhow::Result<Vec<IpNet>> {
     let body = reqwest::get(url).await?.text().await?;
+
+    if format == "json" {
+        let json: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| anyhow::anyhow!("Expected JSON response from {url}: {e}"))?;
+        let mut ranges = Vec::new();
+        for key in &["addresses", "addresses_v6"] {
+            if let Some(arr) = json.get(key).and_then(|v| v.as_array()) {
+                for item in arr {
+                    if let Some(cidr_str) = item.as_str() {
+                        match cidr_str.trim().parse::<IpNet>() {
+                            Ok(net) => ranges.push(net),
+                            Err(e) => tracing::warn!("Skipping invalid CIDR '{}': {}", cidr_str, e),
+                        }
+                    }
+                }
+            }
+        }
+        tracing::info!("Parsed {} CIDR ranges from JSON response at {}", ranges.len(), url);
+        return Ok(ranges);
+    }
+
+    // Default: plain-text, one CIDR per line.
     let mut ranges = Vec::new();
     for line in body.lines() {
         let trimmed = line.trim();
@@ -62,6 +88,7 @@ pub struct DbProvider {
     pub name_val: String,
     pub sni_val: String,
     pub urls: Vec<String>,
+    pub response_format_val: String,
 }
 
 impl CdnProvider for DbProvider {
@@ -80,6 +107,10 @@ impl CdnProvider for DbProvider {
     fn ip_range_urls(&self) -> Vec<&str> {
         self.urls.iter().map(|s| s.as_str()).collect()
     }
+
+    fn response_format(&self) -> &str {
+        &self.response_format_val
+    }
 }
 
 /// Load a provider from the database and return it as a `Box<dyn CdnProvider>`.
@@ -88,7 +119,7 @@ pub async fn get_provider_from_db(
     id: &str,
 ) -> Result<Box<dyn CdnProvider>, AppError> {
     let row = sqlx::query_as::<_, crate::models::Provider>(
-        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers WHERE id = ?",
     )
     .bind(id)
@@ -104,14 +135,16 @@ pub async fn get_provider_from_db(
         name_val: row.name,
         sni_val: row.sni,
         urls,
+        response_format_val: row.response_format,
     }))
 }
 
 /// Fetch and expand all IP ranges for a provider.
 pub async fn fetch_provider_ips(provider: &dyn CdnProvider) -> anyhow::Result<Vec<IpAddr>> {
     let mut all_ranges = Vec::new();
+    let format = provider.response_format();
     for url in provider.ip_range_urls() {
-        match fetch_cidr_list(url).await {
+        match fetch_cidr_list(url, format).await {
             Ok(ranges) => {
                 tracing::info!(
                     "Fetched {} CIDR ranges from {} for {}",

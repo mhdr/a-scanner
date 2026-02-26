@@ -41,6 +41,8 @@ export interface Provider {
   sni: string;
   ip_range_urls: string;
   is_builtin: boolean;
+  /** Response format for upstream URLs: "text" (one CIDR per line) or "json" (JSON with addresses arrays). */
+  response_format: string;
   created_at: string;
   updated_at: string;
 }
