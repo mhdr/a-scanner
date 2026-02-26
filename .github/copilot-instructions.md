@@ -170,9 +170,16 @@ Key endpoints:
 
 ## Development Workflow
 
-- Run backend: `cd backend && cargo run`
-- Run frontend: `cd frontend && npm run dev`
+- Run backend: `./run-backend.sh` (or `cd backend && cargo run`)
+- Run frontend: `./run-frontend.sh` (or `cd frontend && npm run dev`)
 - Run all backend tests: `cd backend && cargo test`
 - Run all frontend tests: `cd frontend && npm test`
 - The backend serves the frontend's built static files in production.
 - In development, use Vite's proxy to forward `/api` requests to the backend.
+
+### Dev Scripts
+
+The project root contains convenience scripts for development:
+
+- `run-backend.sh` — starts the Rust backend via `cargo run`
+- `run-frontend.sh` — installs npm dependencies if needed, then starts the Vite dev server
