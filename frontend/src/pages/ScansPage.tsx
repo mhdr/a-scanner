@@ -24,7 +24,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate, Link } from 'react-router-dom';
 import { useScanStore } from '../stores/scanStore';
 import { useProviderStore } from '../stores/providerStore';
-import { useState } from 'react';
+import { useScanPreferencesStore } from '../stores/scanPreferencesStore';
 import type { ScanStatus } from '../types';
 
 const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error'> = {
@@ -75,17 +75,19 @@ export default function ScansPage() {
     isLoading, error, fetchScans, startScan, setScansPagination,
   } = useScanStore();
   const { providers, fetchProviders, ranges, fetchRanges } = useProviderStore();
-  const [selectedProvider, setSelectedProvider] = useState('cloudflare');
-  const [extended, setExtended] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [concurrency, setConcurrency] = useState(64);
-  const [timeoutMs, setTimeoutMs] = useState(2000);
-  const [port, setPort] = useState(443);
-  const [samples, setSamples] = useState(3);
-  const [extendedConcurrency, setExtendedConcurrency] = useState(200);
-  const [extendedTimeoutMs, setExtendedTimeoutMs] = useState(10000);
-  const [packetLossProbes, setPacketLossProbes] = useState(10);
-  const [ipRanges, setIpRanges] = useState('');
+  const {
+    selectedProvider, setSelectedProvider,
+    extended, setExtended,
+    showAdvanced, setShowAdvanced,
+    concurrency, setConcurrency,
+    timeoutMs, setTimeoutMs,
+    port, setPort,
+    samples, setSamples,
+    extendedConcurrency, setExtendedConcurrency,
+    extendedTimeoutMs, setExtendedTimeoutMs,
+    packetLossProbes, setPacketLossProbes,
+    ipRanges, setIpRanges,
+  } = useScanPreferencesStore();
 
   useEffect(() => {
     fetchScans();
