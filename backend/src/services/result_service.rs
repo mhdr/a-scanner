@@ -20,7 +20,7 @@ pub async fn list_results(
             sqlx::query_as::<_, ScanResult>(
                 "SELECT sr.id, sr.scan_id, sr.ip, sr.latency_ms, sr.is_reachable, sr.created_at,
                         sr.tls_latency_ms, sr.ttfb_ms, sr.download_speed_kbps,
-                        sr.jitter_ms, sr.success_rate, sr.score
+                        sr.jitter_ms, sr.success_rate, sr.packet_loss, sr.score
                  FROM scan_results sr
                  JOIN scans s ON sr.scan_id = s.id
                  WHERE sr.is_reachable = 1 AND s.provider = ?
@@ -36,7 +36,7 @@ pub async fn list_results(
             sqlx::query_as::<_, ScanResult>(
                 "SELECT sr.id, sr.scan_id, sr.ip, sr.latency_ms, sr.is_reachable, sr.created_at,
                         sr.tls_latency_ms, sr.ttfb_ms, sr.download_speed_kbps,
-                        sr.jitter_ms, sr.success_rate, sr.score
+                        sr.jitter_ms, sr.success_rate, sr.packet_loss, sr.score
                  FROM scan_results sr
                  JOIN scans s ON sr.scan_id = s.id
                  WHERE s.provider = ?
@@ -53,7 +53,7 @@ pub async fn list_results(
         sqlx::query_as::<_, ScanResult>(
             "SELECT id, scan_id, ip, latency_ms, is_reachable, created_at,
                     tls_latency_ms, ttfb_ms, download_speed_kbps,
-                    jitter_ms, success_rate, score
+                    jitter_ms, success_rate, packet_loss, score
              FROM scan_results
              WHERE is_reachable = 1
              ORDER BY CASE WHEN score IS NOT NULL THEN score ELSE latency_ms END ASC NULLS LAST
@@ -67,7 +67,7 @@ pub async fn list_results(
         sqlx::query_as::<_, ScanResult>(
             "SELECT id, scan_id, ip, latency_ms, is_reachable, created_at,
                     tls_latency_ms, ttfb_ms, download_speed_kbps,
-                    jitter_ms, success_rate, score
+                    jitter_ms, success_rate, packet_loss, score
              FROM scan_results
              ORDER BY CASE WHEN score IS NOT NULL THEN score ELSE latency_ms END ASC NULLS LAST
              LIMIT ? OFFSET ?",

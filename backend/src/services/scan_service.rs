@@ -31,12 +31,13 @@ pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Sca
     let now = chrono::Utc::now().to_rfc3339();
     let concurrency = req.concurrency.unwrap_or(64);
     let timeout_ms = req.timeout_ms.unwrap_or(2000);
+    let port = req.port.unwrap_or(443);
     let mode = if req.extended { "extended" } else { "basic" };
 
     sqlx::query(
         "INSERT INTO scans (id, provider, status, total_ips, scanned_ips, created_at, updated_at,
                             mode, concurrency, timeout_ms, port, extended)
-         VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 443, ?)",
+         VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&req.provider)
@@ -46,6 +47,7 @@ pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Sca
     .bind(mode)
     .bind(concurrency)
     .bind(timeout_ms)
+    .bind(port)
     .bind(req.extended)
     .execute(db)
     .await?;
@@ -80,7 +82,7 @@ pub async fn get_scan_results(
 
     let results = sqlx::query_as::<_, ScanResult>(
         "SELECT id, scan_id, ip, latency_ms, is_reachable, created_at,
-                tls_latency_ms, ttfb_ms, download_speed_kbps, jitter_ms, success_rate, score
+                tls_latency_ms, ttfb_ms, download_speed_kbps, jitter_ms, success_rate, packet_loss, score
          FROM scan_results
          WHERE scan_id = ? AND is_reachable = 1
          ORDER BY CASE WHEN score IS NOT NULL THEN score ELSE latency_ms END ASC NULLS LAST

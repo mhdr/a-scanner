@@ -63,6 +63,7 @@ pub struct ScanResult {
     pub download_speed_kbps: Option<f64>,
     pub jitter_ms: Option<f64>,
     pub success_rate: Option<f64>,
+    pub packet_loss: Option<f64>,
     pub score: Option<f64>,
 }
 
@@ -130,6 +131,11 @@ pub struct CreateScanRequest {
     pub extended: bool,
     pub concurrency: Option<i64>,
     pub timeout_ms: Option<i64>,
+    pub port: Option<i64>,
+    pub samples: Option<i64>,
+    pub extended_concurrency: Option<i64>,
+    pub extended_timeout_ms: Option<i64>,
+    pub packet_loss_probes: Option<i64>,
     /// Optional explicit list of CIDR ranges to scan. If omitted, uses enabled ranges from DB.
     pub ip_ranges: Option<Vec<String>>,
 }

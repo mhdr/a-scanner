@@ -79,6 +79,14 @@ const extendedColumns: GridColDef[] = [
       params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
   },
   {
+    field: 'packet_loss',
+    headerName: 'Loss (%)',
+    width: 110,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
+  },
+  {
     field: 'score',
     headerName: 'Score',
     width: 110,

@@ -51,11 +51,12 @@ async fn create_scan(
         provider_id: body.provider.clone(),
         concurrency: body.concurrency.unwrap_or(64) as usize,
         timeout_ms: body.timeout_ms.unwrap_or(2000) as u64,
-        port: 443,
+        port: body.port.unwrap_or(443) as u16,
         extended: body.extended,
-        samples: 3,
-        extended_concurrency: 200,
-        extended_timeout_ms: 10000,
+        samples: body.samples.unwrap_or(3) as usize,
+        extended_concurrency: body.extended_concurrency.unwrap_or(200) as usize,
+        extended_timeout_ms: body.extended_timeout_ms.unwrap_or(10000) as u64,
+        packet_loss_probes: body.packet_loss_probes.unwrap_or(10) as usize,
         ip_ranges: body.ip_ranges.clone(),
     };
 

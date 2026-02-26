@@ -30,6 +30,7 @@ export interface ScanResult {
   download_speed_kbps: number | null;
   jitter_ms: number | null;
   success_rate: number | null;
+  packet_loss: number | null;
   score: number | null;
 }
 
@@ -75,6 +76,11 @@ export interface CreateScanRequest {
   extended?: boolean;
   concurrency?: number;
   timeout_ms?: number;
+  port?: number;
+  samples?: number;
+  extended_concurrency?: number;
+  extended_timeout_ms?: number;
+  packet_loss_probes?: number;
   /** Optional explicit list of CIDR ranges to scan. If omitted, uses enabled ranges from DB. */
   ip_ranges?: string[];
 }

@@ -286,6 +286,7 @@ async fn run_scan_inner(
         let ext_timeout = config.extended_timeout_ms;
         let samples = config.samples;
         let ext_concurrency = config.extended_concurrency;
+        let packet_loss_probes = config.packet_loss_probes;
         let connector = tls_connector.clone();
 
         let extended_results: Arc<tokio::sync::Mutex<Vec<super::ExtendedResult>>> =
@@ -305,7 +306,7 @@ async fn run_scan_inner(
 
                 async move {
                     let result = run_extended_tests(
-                        ip, tcp_ms, port, &sni, ext_timeout, samples, &connector,
+                        ip, tcp_ms, port, &sni, ext_timeout, samples, packet_loss_probes, &connector,
                     )
                     .await;
 
@@ -313,7 +314,7 @@ async fn run_scan_inner(
                     let _ = sqlx::query(
                         "UPDATE scan_results SET
                             tls_latency_ms = ?, ttfb_ms = ?, download_speed_kbps = ?,
-                            jitter_ms = ?, success_rate = ?, score = ?
+                            jitter_ms = ?, success_rate = ?, packet_loss = ?, score = ?
                          WHERE scan_id = ? AND ip = ?",
                     )
                     .bind(result.tls_ms.map(|v| v as i64))
@@ -321,6 +322,7 @@ async fn run_scan_inner(
                     .bind(result.download_speed_kbps)
                     .bind(result.jitter_ms)
                     .bind(result.success_rate)
+                    .bind(result.packet_loss)
                     .bind(result.score)
                     .bind(&scan_id)
                     .bind(ip.to_string())

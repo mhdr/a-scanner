@@ -31,6 +31,8 @@ pub struct ScanConfig {
     pub extended_concurrency: usize,
     /// Timeout for extended tests in milliseconds.
     pub extended_timeout_ms: u64,
+    /// Number of TCP probes for packet loss measurement (extended mode).
+    pub packet_loss_probes: usize,
     /// Optional explicit list of CIDR ranges to scan.
     /// If `None`, the orchestrator reads enabled ranges from the database.
     pub ip_ranges: Option<Vec<String>>,
@@ -47,6 +49,7 @@ impl Default for ScanConfig {
             samples: 3,
             extended_concurrency: 200,
             extended_timeout_ms: 10000,
+            packet_loss_probes: 10,
             ip_ranges: None,
         }
     }
@@ -70,6 +73,7 @@ pub struct ExtendedResult {
     pub download_speed_kbps: Option<f64>,
     pub jitter_ms: Option<f64>,
     pub success_rate: f64,
+    pub packet_loss: f64,
     pub score: f64,
 }
 
@@ -91,10 +95,14 @@ impl ExtendedResult {
             0.0
         };
 
-        self.score = (0.3 * ttfb_score)
-            + (0.4 * speed_score)
-            + (0.2 * jitter_score)
-            + (0.1 * tls_score)
+        // Penalize packet loss (0-100 scale, so 10% loss = 1000 penalty)
+        let packet_loss_penalty = self.packet_loss * 100.0;
+
+        self.score = (0.25 * ttfb_score)
+            + (0.30 * speed_score)
+            + (0.15 * jitter_score)
+            + (0.10 * tls_score)
+            + (0.20 * packet_loss_penalty)
             + success_penalty;
     }
 }
@@ -285,6 +293,31 @@ pub async fn test_download_speed(
     }
 }
 
+/// Test packet loss by sending multiple TCP connect probes and measuring failure rate.
+///
+/// Returns packet loss as a percentage (0.0–100.0).
+pub async fn test_packet_loss(
+    ip: IpAddr,
+    port: u16,
+    timeout_ms: u64,
+    probes: usize,
+) -> f64 {
+    let addr = SocketAddr::new(ip, port);
+    let duration = Duration::from_millis(timeout_ms);
+    let mut failures = 0usize;
+
+    for _ in 0..probes {
+        match timeout(duration, TcpStream::connect(addr)).await {
+            Ok(Ok(_)) => {} // success
+            _ => failures += 1,
+        }
+        // Small delay between probes to avoid burst effects
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    (failures as f64 / probes as f64) * 100.0
+}
+
 /// Quick functional verification of an IP: single TLS handshake + TTFB test.
 ///
 /// Used as a lightweight filter before running the expensive extended test battery.
@@ -314,6 +347,7 @@ pub async fn run_extended_tests(
     sni: &str,
     timeout_ms: u64,
     samples: usize,
+    packet_loss_probes: usize,
     connector: &TlsConnector,
 ) -> ExtendedResult {
     let mut ttfb_samples: Vec<u64> = Vec::with_capacity(samples);
@@ -340,6 +374,9 @@ pub async fn run_extended_tests(
 
     // Download speed test (single measurement)
     let download_speed = test_download_speed(ip, port, sni, timeout_ms, connector).await;
+
+    // Packet loss test
+    let packet_loss = test_packet_loss(ip, port, timeout_ms, packet_loss_probes).await;
 
     // Calculate TTFB average
     let ttfb_avg = if !ttfb_samples.is_empty() {
@@ -374,6 +411,7 @@ pub async fn run_extended_tests(
         download_speed_kbps: download_speed,
         jitter_ms: jitter,
         success_rate,
+        packet_loss,
         score: 0.0,
     };
 

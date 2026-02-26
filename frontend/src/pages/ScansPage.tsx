@@ -6,6 +6,7 @@ import {
   CardContent,
   Chip,
   Collapse,
+  Divider,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -75,6 +76,12 @@ export default function ScansPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [concurrency, setConcurrency] = useState(64);
   const [timeoutMs, setTimeoutMs] = useState(2000);
+  const [port, setPort] = useState(443);
+  const [samples, setSamples] = useState(3);
+  const [extendedConcurrency, setExtendedConcurrency] = useState(200);
+  const [extendedTimeoutMs, setExtendedTimeoutMs] = useState(10000);
+  const [packetLossProbes, setPacketLossProbes] = useState(10);
+  const [ipRanges, setIpRanges] = useState('');
 
   useEffect(() => {
     fetchScans();
@@ -93,11 +100,24 @@ export default function ScansPage() {
   const totalIps = providerRanges.reduce((sum, r) => sum + r.ip_count, 0);
 
   const handleStartScan = async () => {
+    const parsedRanges = ipRanges
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     await startScan({
       provider: selectedProvider,
       extended,
       concurrency,
       timeout_ms: timeoutMs,
+      port,
+      ...(extended && {
+        samples,
+        extended_concurrency: extendedConcurrency,
+        extended_timeout_ms: extendedTimeoutMs,
+        packet_loss_probes: packetLossProbes,
+      }),
+      ...(parsedRanges.length > 0 && { ip_ranges: parsedRanges }),
     });
     // Navigate to the newly created scan
     const { scans: updatedScans } = useScanStore.getState();
@@ -153,24 +173,99 @@ export default function ScansPage() {
       <Collapse in={showAdvanced}>
         <Card sx={{ mb: 2 }}>
           <CardContent>
-            <Stack direction="row" spacing={3}>
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap>
+                <TextField
+                  label="Concurrency"
+                  type="number"
+                  size="small"
+                  value={concurrency}
+                  onChange={(e) => setConcurrency(Number(e.target.value))}
+                  slotProps={{ htmlInput: { min: 1, max: 10000 } }}
+                  sx={{ width: 140 }}
+                />
+                <TextField
+                  label="Timeout (ms)"
+                  type="number"
+                  size="small"
+                  value={timeoutMs}
+                  onChange={(e) => setTimeoutMs(Number(e.target.value))}
+                  slotProps={{ htmlInput: { min: 100, max: 30000, step: 100 } }}
+                  sx={{ width: 140 }}
+                />
+                <TextField
+                  label="Port"
+                  type="number"
+                  size="small"
+                  value={port}
+                  onChange={(e) => setPort(Number(e.target.value))}
+                  slotProps={{ htmlInput: { min: 1, max: 65535 } }}
+                  sx={{ width: 120 }}
+                />
+              </Stack>
+
+              {extended && (
+                <>
+                  <Divider>
+                    <Typography variant="caption" color="text.secondary">
+                      Extended Settings
+                    </Typography>
+                  </Divider>
+                  <Stack direction="row" spacing={3} flexWrap="wrap" useFlexGap>
+                    <TextField
+                      label="TTFB Samples"
+                      type="number"
+                      size="small"
+                      value={samples}
+                      onChange={(e) => setSamples(Number(e.target.value))}
+                      slotProps={{ htmlInput: { min: 1, max: 20 } }}
+                      helperText="TTFB measurement iterations"
+                      sx={{ width: 160 }}
+                    />
+                    <TextField
+                      label="Ext. Concurrency"
+                      type="number"
+                      size="small"
+                      value={extendedConcurrency}
+                      onChange={(e) => setExtendedConcurrency(Number(e.target.value))}
+                      slotProps={{ htmlInput: { min: 1, max: 1000 } }}
+                      helperText="Concurrent extended tests"
+                      sx={{ width: 170 }}
+                    />
+                    <TextField
+                      label="Ext. Timeout (ms)"
+                      type="number"
+                      size="small"
+                      value={extendedTimeoutMs}
+                      onChange={(e) => setExtendedTimeoutMs(Number(e.target.value))}
+                      slotProps={{ htmlInput: { min: 1000, max: 60000, step: 1000 } }}
+                      helperText="Timeout for extended tests"
+                      sx={{ width: 170 }}
+                    />
+                    <TextField
+                      label="Loss Probes"
+                      type="number"
+                      size="small"
+                      value={packetLossProbes}
+                      onChange={(e) => setPacketLossProbes(Number(e.target.value))}
+                      slotProps={{ htmlInput: { min: 1, max: 50 } }}
+                      helperText="TCP probes for packet loss"
+                      sx={{ width: 160 }}
+                    />
+                  </Stack>
+                </>
+              )}
+
               <TextField
-                label="Concurrency"
-                type="number"
+                label="Custom IP Ranges (CIDR)"
+                multiline
+                minRows={2}
+                maxRows={6}
                 size="small"
-                value={concurrency}
-                onChange={(e) => setConcurrency(Number(e.target.value))}
-                slotProps={{ htmlInput: { min: 1, max: 10000 } }}
-                sx={{ width: 140 }}
-              />
-              <TextField
-                label="Timeout (ms)"
-                type="number"
-                size="small"
-                value={timeoutMs}
-                onChange={(e) => setTimeoutMs(Number(e.target.value))}
-                slotProps={{ htmlInput: { min: 100, max: 30000, step: 100 } }}
-                sx={{ width: 140 }}
+                value={ipRanges}
+                onChange={(e) => setIpRanges(e.target.value)}
+                placeholder={"1.0.0.0/24\n1.1.1.0/24"}
+                helperText="One CIDR range per line. Leave empty to use provider defaults."
               />
             </Stack>
           </CardContent>
