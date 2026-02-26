@@ -264,7 +264,11 @@ show_summary() {
 do_install() {
     local auto_yes="$1"
     require_root
-    show_banner
+
+    # Banner already shown by action chooser; show it only if action came from CLI
+    if [[ "$action_from_cli" == "true" || "$auto_yes" == "true" ]]; then
+        show_banner
+    fi
 
     # --- locate binary first (before asking questions) ---
     step "Locating binary"
@@ -379,7 +383,11 @@ UNIT
 
 do_uninstall() {
     require_root
-    show_banner
+
+    # Banner already shown by action chooser; show it only if action came from CLI
+    if [[ "$action_from_cli" == "true" ]]; then
+        show_banner
+    fi
 
     step "Uninstalling ${APP_NAME}"
     echo ""
@@ -456,11 +464,35 @@ do_uninstall() {
     echo ""
 }
 
+# ---------- action chooser ----------
+
+choose_action() {
+    show_banner
+    step "What would you like to do?"
+    echo ""
+    printf "  ${_C}1${_RESET})  ${_W}Install / Update${_RESET}   — install ${APP_NAME} or upgrade to a new version\n"
+    printf "  ${_C}2${_RESET})  ${_W}Uninstall${_RESET}          — stop and remove ${APP_NAME}\n"
+    echo ""
+    printf "  ${_W}›${_RESET} Choose an option ${_D}[1]${_RESET}: "
+    local choice
+    read -r choice
+    choice="${choice:-1}"
+    case "$choice" in
+        1) echo "install" ;;
+        2) echo "uninstall" ;;
+        *)
+            err "Invalid choice: ${choice}"
+            exit 1
+            ;;
+    esac
+}
+
 # ---------- main ----------
 
 main() {
-    local action="install"
+    local action=""
     local auto_yes="false"
+    local action_from_cli="false"
 
     # Mutable config — set from defaults, overridable by flags, then by prompts
     PORT="${DEFAULT_PORT}"
@@ -472,6 +504,7 @@ main() {
         case "$1" in
             uninstall)
                 action="uninstall"
+                action_from_cli="true"
                 shift
                 ;;
             --port)
@@ -513,6 +546,15 @@ main() {
                 ;;
         esac
     done
+
+    # If no action was specified on the CLI, ask interactively
+    if [[ -z "$action" ]]; then
+        if [[ "$auto_yes" == "true" ]]; then
+            action="install"
+        else
+            action="$(choose_action)"
+        fi
+    fi
 
     case "$action" in
         install)   do_install "$auto_yes" ;;
