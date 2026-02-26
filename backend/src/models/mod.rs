@@ -189,3 +189,55 @@ pub struct UpdateProviderSettingsRequest {
     pub auto_update: Option<bool>,
     pub auto_update_interval_hours: Option<i64>,
 }
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+/// Admin user row from the database.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct User {
+    pub id: String,
+    pub username: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Request body for logging in.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+/// Response body after successful login.
+#[derive(Debug, Clone, Serialize)]
+pub struct LoginResponse {
+    pub token: String,
+}
+
+/// Request body for changing password.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+/// Response for GET /auth/me.
+#[derive(Debug, Clone, Serialize)]
+pub struct AuthMeResponse {
+    pub username: String,
+}
+
+/// JWT claims payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    /// Subject (username).
+    pub sub: String,
+    /// Expiration time (Unix timestamp).
+    pub exp: usize,
+    /// Issued at (Unix timestamp).
+    pub iat: usize,
+}

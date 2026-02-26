@@ -1,18 +1,23 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { ScanProgressEvent } from '../types';
 import { useScanStore } from '../stores/scanStore';
+import { getToken } from '../api';
 
 /**
  * Derive the WebSocket URL for a scan from the current page location.
+ * Appends the JWT token as a query parameter for authentication.
  * In dev mode the Vite proxy handles `/api` → backend, so we just
  * build a relative `ws://` or `wss://` URL.
  */
-function buildWsUrl(scanId: string): string {
+function buildWsUrl(scanId: string): string | null {
+  const token = getToken();
+  if (!token) return null;
+
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const base = import.meta.env.VITE_API_URL
     ? new URL(import.meta.env.VITE_API_URL).host
     : window.location.host;
-  return `${proto}://${base}/api/v1/scans/${scanId}/ws`;
+  return `${proto}://${base}/api/v1/scans/${scanId}/ws?token=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -58,6 +63,12 @@ export function useScanProgress(scanId: string | undefined, active: boolean) {
     }
 
     const url = buildWsUrl(scanId);
+    if (!url) {
+      // No auth token — fall back to polling
+      startPolling();
+      return () => { stopPolling(); };
+    }
+
     const ws = new WebSocket(url);
     wsRef.current = ws;
 

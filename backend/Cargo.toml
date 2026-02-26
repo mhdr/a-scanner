@@ -37,6 +37,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rust-embed = { version = "8", features = ["mime-guess"] }
 mime_guess = "2"
 
+# Authentication
+argon2 = "0.5"
+jsonwebtoken = "9"
+rand = "0.8"
+hex = "0.4"
+
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }

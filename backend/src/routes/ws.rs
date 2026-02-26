@@ -2,29 +2,60 @@ use std::sync::Arc;
 
 use axum::{
     Router,
-    extract::{Path, State, WebSocketUpgrade, ws::Message},
+    extract::{Path, Query, State, WebSocketUpgrade, ws::Message},
+    http::StatusCode,
     response::IntoResponse,
     routing::get,
+    Json,
 };
+use serde::Deserialize;
 
 use crate::AppState;
 use crate::models::ScanStatus;
 use crate::services;
 
+/// Query parameters for WebSocket auth.
+#[derive(Debug, Deserialize)]
+struct WsQuery {
+    token: Option<String>,
+}
+
 pub fn router() -> Router<Arc<AppState>> {
     Router::new().route("/api/v1/scans/{id}/ws", get(scan_ws_handler))
 }
 
-/// GET /api/v1/scans/:id/ws — WebSocket endpoint for real-time scan progress.
+/// GET /api/v1/scans/:id/ws?token=<jwt> — WebSocket endpoint for real-time scan progress.
 ///
+/// Requires a valid JWT passed as the `token` query parameter.
 /// If the scan is already completed/failed, sends a single status message and
 /// closes. Otherwise, subscribes to the scan's broadcast channel and streams
 /// progress events as JSON text frames.
 async fn scan_ws_handler(
     State(state): State<Arc<AppState>>,
     Path(scan_id): Path<String>,
+    Query(query): Query<WsQuery>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
+    // Validate JWT from query parameter
+    let token = match query.token {
+        Some(t) => t,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({ "error": "Missing token query parameter" })),
+            )
+                .into_response();
+        }
+    };
+
+    if let Err(_) = services::auth_service::validate_jwt(&token, &state.jwt_secret) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({ "error": "Invalid or expired token" })),
+        )
+            .into_response();
+    }
+
     ws.on_upgrade(move |mut socket| async move {
         // Look up the scan in the DB
         let scan = match services::scan_service::get_scan(&state.db, &scan_id).await {
@@ -116,4 +147,5 @@ async fn scan_ws_handler(
             }
         }
     })
+    .into_response()
 }

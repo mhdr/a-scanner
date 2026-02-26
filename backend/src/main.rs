@@ -25,6 +25,10 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Database initialized");
 
+    // Seed default admin user and load/generate JWT secret
+    services::auth_service::seed_admin_user(&pool).await?;
+    let jwt_secret = services::auth_service::get_or_create_jwt_secret(&pool).await?;
+
     // Spawn auto-update background task for provider IP ranges
     let auto_update_pool = pool.clone();
     tokio::spawn(async move {
@@ -35,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
     let tls_connector = scanner::create_tls_connector();
 
     // Build shared state
-    let state = AppState::new(pool, tls_connector);
+    let state = AppState::new(pool, tls_connector, jwt_secret);
 
     // CORS layer for development
     let cors = CorsLayer::new()
@@ -45,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the application router
     let app = Router::new()
-        .merge(routes::app_router())
+        .merge(routes::app_router(state.clone()))
         .layer(CompressionLayer::new())
         .layer(cors)
         .layer(TraceLayer::new_for_http())

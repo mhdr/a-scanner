@@ -1,8 +1,12 @@
 import type {
+  AuthUser,
+  ChangePasswordRequest,
   CreateProviderRequest,
   CreateRangeRequest,
   CreateScanRequest,
   BulkToggleRequest,
+  LoginRequest,
+  LoginResponse,
   PaginatedResponse,
   PaginationParams,
   Provider,
@@ -18,11 +22,45 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+/** Key used for storing the JWT in localStorage. */
+const TOKEN_KEY = 'auth_token';
+
+/** Read the stored auth token. */
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+/** Persist an auth token. */
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+/** Remove the stored auth token. */
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
+
+  if (response.status === 401) {
+    clearToken();
+    // Redirect to login unless already on the login page
+    if (!window.location.pathname.startsWith('/login')) {
+      window.location.href = '/login';
+    }
+    throw new Error('Session expired — please log in again');
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -153,5 +191,27 @@ export async function updateProviderSettings(
 ): Promise<ProviderSettings> {
   return request(`/api/v1/providers/${providerId}/settings`, {
     method: 'PUT', body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export async function login(body: LoginRequest): Promise<LoginResponse> {
+  return request('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getMe(): Promise<AuthUser> {
+  return request('/api/v1/auth/me');
+}
+
+export async function changePassword(body: ChangePasswordRequest): Promise<void> {
+  await request('/api/v1/auth/password', {
+    method: 'PUT',
+    body: JSON.stringify(body),
   });
 }

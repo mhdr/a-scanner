@@ -159,3 +159,29 @@ export interface UpdateProviderSettingsRequest {
   auto_update?: boolean;
   auto_update_interval_hours?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+/// Request body for logging in.
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+/// Response body after successful login.
+export interface LoginResponse {
+  token: string;
+}
+
+/// Request body for changing password.
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+/// Authenticated user info returned by GET /auth/me.
+export interface AuthUser {
+  username: string;
+}

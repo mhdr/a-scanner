@@ -18,15 +18,18 @@ use crate::models::ScanProgressEvent;
 pub struct AppState {
     pub db: SqlitePool,
     pub tls_connector: Arc<TlsConnector>,
+    /// JWT signing/verification secret.
+    pub jwt_secret: Vec<u8>,
     /// Per-scan broadcast channels for real-time progress updates.
     scan_channels: Arc<Mutex<HashMap<String, broadcast::Sender<ScanProgressEvent>>>>,
 }
 
 impl AppState {
-    pub fn new(db: SqlitePool, tls_connector: TlsConnector) -> Arc<Self> {
+    pub fn new(db: SqlitePool, tls_connector: TlsConnector, jwt_secret: Vec<u8>) -> Arc<Self> {
         Arc::new(Self {
             db,
             tls_connector: Arc::new(tls_connector),
+            jwt_secret,
             scan_channels: Arc::new(Mutex::new(HashMap::new())),
         })
     }
