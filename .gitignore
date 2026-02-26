@@ -1,0 +1,36 @@
+# Rust
+/backend/target/
+**/*.rs.bk
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Node / Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# github
+.github
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
