@@ -9,6 +9,8 @@ import {
   LinearProgress,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -97,6 +99,14 @@ const extendedColumns: GridColDef[] = [
   },
 ];
 
+/** Columns hidden on mobile for extended scan results */
+const mobileExtendedColumnVisibility: Record<string, boolean> = {
+  tls_latency_ms: false,
+  download_speed_kbps: false,
+  jitter_ms: false,
+  packet_loss: false,
+};
+
 const PHASE_LABELS: Record<string, string> = {
   pending: 'Waiting to start…',
   resolving: 'Resolving IP ranges…',
@@ -112,6 +122,8 @@ const PHASE_LABELS: Record<string, string> = {
 export default function ScanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const {
     currentScan, currentPhase, extendedDone, extendedTotal,
     currentResults, resultsTotal, resultsPage, resultsPageSize,
@@ -182,7 +194,7 @@ export default function ScanDetailPage() {
           <CardContent>
             <Stack spacing={1}>
               <Typography variant="h5">Scan: {currentScan.id}</Typography>
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
                 <Typography variant="body1">
                   Provider: <strong>{currentScan.provider}</strong>
                 </Typography>
@@ -252,6 +264,7 @@ export default function ScanDetailPage() {
             pageSizeOptions={[10, 25, 50, 100]}
             sortingMode="server"
             loading={isResultsLoading}
+            columnVisibilityModel={isMobile && isExtended ? mobileExtendedColumnVisibility : undefined}
             autoHeight
             disableRowSelectionOnClick
           />

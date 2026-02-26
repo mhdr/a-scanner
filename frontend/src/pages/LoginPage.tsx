@@ -39,8 +39,8 @@ export default function LoginPage() {
         bgcolor: 'background.default',
       }}
     >
-      <Card sx={{ width: 380, mx: 2 }}>
-        <CardContent sx={{ p: 4 }}>
+      <Card sx={{ maxWidth: 380, width: '100%', mx: 2 }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 4 } }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <RadarIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
             <Typography variant="h5" fontWeight="bold">

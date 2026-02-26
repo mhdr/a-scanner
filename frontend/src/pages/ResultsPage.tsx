@@ -6,6 +6,8 @@ import {
   FormControlLabel,
   Switch,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -81,7 +83,18 @@ const columns: GridColDef[] = [
   { field: 'scan_id', headerName: 'Scan ID', width: 280 },
 ];
 
+/** Columns hidden on mobile */
+const mobileColumnVisibility: Record<string, boolean> = {
+  tls_latency_ms: false,
+  download_speed_kbps: false,
+  jitter_ms: false,
+  packet_loss: false,
+  scan_id: false,
+};
+
 export default function ResultsPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const {
     results, total, page, pageSize, isLoading, error,
     reachableOnly, setReachableOnly, setPagination, fetchResults,
@@ -129,6 +142,7 @@ export default function ResultsPage() {
             pageSizeOptions={[10, 25, 50, 100]}
             sortingMode="server"
             loading={isLoading}
+            columnVisibilityModel={isMobile ? mobileColumnVisibility : undefined}
             autoHeight
             disableRowSelectionOnClick
           />

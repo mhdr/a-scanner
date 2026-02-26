@@ -17,6 +17,8 @@ import {
   Switch,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -68,8 +70,18 @@ const columns: GridColDef[] = [
   { field: 'created_at', headerName: 'Created', width: 200 },
 ];
 
+/** Columns visible on mobile screens */
+const mobileColumnVisibility: Record<string, boolean> = {
+  id: false,
+  mode: false,
+  total_ips: false,
+  scanned_ips: false,
+};
+
 export default function ScansPage() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const {
     scans, scansTotal, scansPage, scansPageSize,
     isScansLoading, isStarting, error, fetchScans, startScan, setScansPagination,
@@ -138,9 +150,15 @@ export default function ScansPage() {
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
         <Typography variant="h4">Scans</Typography>
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
           <FormControl size="small" sx={{ minWidth: 160 }}>
             <InputLabel>Provider</InputLabel>
             <Select
@@ -319,6 +337,7 @@ export default function ScansPage() {
             pageSizeOptions={[10, 25, 50, 100]}
             onRowClick={(params) => navigate(`/scans/${params.id}`)}
             loading={isScansLoading}
+            columnVisibilityModel={isMobile ? mobileColumnVisibility : undefined}
             autoHeight
             disableRowSelectionOnClick
             sx={{ cursor: 'pointer' }}

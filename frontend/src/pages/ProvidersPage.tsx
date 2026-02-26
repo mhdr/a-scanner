@@ -3,10 +3,11 @@ import {
   Alert, Box, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControlLabel, IconButton, List,
   ListItemButton, ListItemIcon, ListItemText, Paper, Stack, Switch, TextField,
-  Tooltip, Typography,
+  Tooltip, Typography, useMediaQuery, useTheme,
 } from '@mui/material';
 import { DataGrid, type GridColDef, type GridRowSelectionModel } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
@@ -197,6 +198,8 @@ interface ProviderDetailProps {
 }
 
 function ProviderDetail({ provider }: ProviderDetailProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const {
     ranges, rangesLoading, settings, settingsLoading, error,
     fetchRanges, triggerFetchFromSource, addRange, editRange, removeRange,
@@ -308,18 +311,18 @@ function ProviderDetail({ provider }: ProviderDetailProps) {
           onChange={() => handleToggleEnabled(params.row as ProviderRange)} />
       ),
     },
-    { field: 'cidr', headerName: 'CIDR Range', flex: 1, minWidth: 180 },
+    { field: 'cidr', headerName: 'CIDR Range', flex: 1, minWidth: 150 },
     {
       field: 'ip_count', headerName: 'IPs', width: 110, type: 'number',
       renderCell: (params) => (params.value as number).toLocaleString(),
     },
-    {
+    ...(!isMobile ? [{
       field: 'is_custom', headerName: 'Source', width: 110,
-      renderCell: (params) => (
+      renderCell: (params: { value: unknown }) => (
         <Chip label={params.value ? 'Custom' : 'Auto'} size="small" variant="outlined"
           color={params.value ? 'secondary' : 'default'} />
       ),
-    },
+    } as GridColDef] : []),
     {
       field: 'actions', headerName: 'Actions', width: 100, sortable: false, filterable: false,
       renderCell: (params) => (
@@ -364,7 +367,7 @@ function ProviderDetail({ provider }: ProviderDetailProps) {
           {provider.description && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{provider.description}</Typography>
           )}
-          <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
+          <Stack direction="row" spacing={2} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
             <Typography variant="body2" color="text.secondary">
               <strong>SNI:</strong> {provider.sni}
             </Typography>
@@ -385,7 +388,7 @@ function ProviderDetail({ provider }: ProviderDetailProps) {
       {/* Settings card */}
       <Card variant="outlined" sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Stack direction="row" spacing={3} alignItems="center" flexWrap="wrap">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 3 }} alignItems={{ xs: 'stretch', sm: 'center' }} flexWrap="wrap">
             <FormControlLabel
               control={
                 <Switch checked={providerSettings?.auto_update ?? false}
@@ -499,7 +502,7 @@ interface ProviderListPanelProps {
 
 function ProviderListPanel({ providers, selectedId, onSelect, onAdd, onDelete, ranges }: ProviderListPanelProps) {
   return (
-    <Paper variant="outlined" sx={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+    <Paper variant="outlined" sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, py: 1.5 }}>
         <Typography variant="subtitle1" fontWeight={600}>Providers</Typography>
         <Tooltip title="Add provider">
@@ -553,6 +556,8 @@ function ProviderListPanel({ providers, selectedId, onSelect, onAdd, onDelete, r
 // ---------------------------------------------------------------------------
 
 export default function ProvidersPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const {
     providers, selectedProviderId, isLoading, error, ranges,
     fetchProviders, selectProvider, createProvider, deleteProvider,
@@ -592,6 +597,27 @@ export default function ProvidersPage() {
 
       {isLoading ? (
         <Typography>Loading providers...</Typography>
+      ) : isMobile ? (
+        /* Mobile: master-detail — show list or detail, not both */
+        selectedProvider ? (
+          <Box>
+            <Button startIcon={<ArrowBackIcon />} onClick={() => selectProvider('')} sx={{ mb: 2 }}>
+              All Providers
+            </Button>
+            <ProviderDetail provider={selectedProvider} />
+          </Box>
+        ) : (
+          <Box>
+            <ProviderListPanel
+              providers={providers}
+              selectedId={selectedProviderId}
+              onSelect={selectProvider}
+              onAdd={() => setAddProviderOpen(true)}
+              onDelete={(p) => setDeleteTarget(p)}
+              ranges={ranges}
+            />
+          </Box>
+        )
       ) : (
         <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', minHeight: 400 }}>
           <ProviderListPanel
