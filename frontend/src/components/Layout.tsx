@@ -17,6 +17,7 @@ interface LayoutProps {
 
 const navItems = [
   { label: 'Scans', path: '/scans' },
+  { label: 'Providers', path: '/providers' },
   { label: 'Results', path: '/results' },
 ];
 

@@ -9,6 +9,7 @@ import {
   FormControl,
   FormControlLabel,
   InputLabel,
+  Link as MuiLink,
   MenuItem,
   Select,
   Stack,
@@ -19,7 +20,7 @@ import {
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useScanStore } from '../stores/scanStore';
 import { useProviderStore } from '../stores/providerStore';
 import { useState } from 'react';
@@ -68,7 +69,7 @@ const columns: GridColDef[] = [
 export default function ScansPage() {
   const navigate = useNavigate();
   const { scans, isLoading, error, fetchScans, startScan } = useScanStore();
-  const { providers, fetchProviders } = useProviderStore();
+  const { providers, fetchProviders, ranges, fetchRanges } = useProviderStore();
   const [selectedProvider, setSelectedProvider] = useState('cloudflare');
   const [extended, setExtended] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -79,6 +80,17 @@ export default function ScansPage() {
     fetchScans();
     fetchProviders();
   }, [fetchScans, fetchProviders]);
+
+  // Load ranges when provider changes
+  useEffect(() => {
+    if (selectedProvider) fetchRanges(selectedProvider);
+  }, [selectedProvider, fetchRanges]);
+
+  // Range summary for selected provider
+  const providerRanges = ranges[selectedProvider] ?? [];
+  const enabledRanges = providerRanges.filter((r) => r.enabled);
+  const enabledIps = enabledRanges.reduce((sum, r) => sum + r.ip_count, 0);
+  const totalIps = providerRanges.reduce((sum, r) => sum + r.ip_count, 0);
 
   const handleStartScan = async () => {
     await startScan({
@@ -164,6 +176,23 @@ export default function ScansPage() {
           </CardContent>
         </Card>
       </Collapse>
+
+      {/* Range summary for selected provider */}
+      {providerRanges.length > 0 && (
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography variant="body2">
+                {enabledRanges.length}/{providerRanges.length} ranges enabled
+                ({enabledIps.toLocaleString()} / {totalIps.toLocaleString()} IPs)
+              </Typography>
+              <MuiLink component={Link} to="/providers" variant="body2">
+                Manage ranges
+              </MuiLink>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>

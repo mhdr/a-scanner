@@ -5,7 +5,7 @@ use ipnet::IpNet;
 use super::CdnProvider;
 
 /// Fetch a URL and parse each non-empty, non-comment line as an IpNet CIDR range.
-async fn fetch_cidr_list(url: &str) -> anyhow::Result<Vec<IpNet>> {
+pub(crate) async fn fetch_cidr_list(url: &str) -> anyhow::Result<Vec<IpNet>> {
     let body = reqwest::get(url).await?.text().await?;
     let mut ranges = Vec::new();
     for line in body.lines() {

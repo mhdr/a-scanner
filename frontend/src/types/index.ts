@@ -52,6 +52,8 @@ export interface CreateScanRequest {
   extended?: boolean;
   concurrency?: number;
   timeout_ms?: number;
+  /** Optional explicit list of CIDR ranges to scan. If omitted, uses enabled ranges from DB. */
+  ip_ranges?: string[];
 }
 
 /// Result filter parameters.
@@ -63,4 +65,48 @@ export interface ResultFilterParams extends PaginationParams {
 /// API error response.
 export interface ApiError {
   error: string;
+}
+
+/// A provider IP range (CIDR block).
+export interface ProviderRange {
+  id: string;
+  provider_id: string;
+  cidr: string;
+  ip_count: number;
+  enabled: boolean;
+  is_custom: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/// Per-provider auto-update settings.
+export interface ProviderSettings {
+  provider_id: string;
+  auto_update: boolean;
+  auto_update_interval_hours: number;
+  last_fetched_at: string | null;
+}
+
+/// Request body for creating a custom IP range.
+export interface CreateRangeRequest {
+  cidr: string;
+  enabled?: boolean;
+}
+
+/// Request body for updating an IP range.
+export interface UpdateRangeRequest {
+  cidr?: string;
+  enabled?: boolean;
+}
+
+/// Request body for bulk-toggling ranges.
+export interface BulkToggleRequest {
+  range_ids: string[];
+  enabled: boolean;
+}
+
+/// Request body for updating provider settings.
+export interface UpdateProviderSettingsRequest {
+  auto_update?: boolean;
+  auto_update_interval_hours?: number;
 }

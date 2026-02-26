@@ -74,6 +74,28 @@ pub struct Provider {
     pub description: String,
 }
 
+/// A provider IP range (CIDR block) stored in the database.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProviderRange {
+    pub id: String,
+    pub provider_id: String,
+    pub cidr: String,
+    pub ip_count: i64,
+    pub enabled: bool,
+    pub is_custom: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Per-provider settings controlling auto-update behavior.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProviderSettings {
+    pub provider_id: String,
+    pub auto_update: bool,
+    pub auto_update_interval_hours: i64,
+    pub last_fetched_at: Option<String>,
+}
+
 /// Request body for creating a new scan.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateScanRequest {
@@ -82,4 +104,34 @@ pub struct CreateScanRequest {
     pub extended: bool,
     pub concurrency: Option<i64>,
     pub timeout_ms: Option<i64>,
+    /// Optional explicit list of CIDR ranges to scan. If omitted, uses enabled ranges from DB.
+    pub ip_ranges: Option<Vec<String>>,
+}
+
+/// Request body for creating a custom IP range.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateRangeRequest {
+    pub cidr: String,
+    pub enabled: Option<bool>,
+}
+
+/// Request body for updating an IP range.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateRangeRequest {
+    pub cidr: Option<String>,
+    pub enabled: Option<bool>,
+}
+
+/// Request body for bulk-toggling range enabled state.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BulkToggleRequest {
+    pub range_ids: Vec<String>,
+    pub enabled: bool,
+}
+
+/// Request body for updating provider settings.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateProviderSettingsRequest {
+    pub auto_update: Option<bool>,
+    pub auto_update_interval_hours: Option<i64>,
 }

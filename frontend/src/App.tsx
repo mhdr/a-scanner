@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import ScansPage from './pages/ScansPage';
 import ScanDetailPage from './pages/ScanDetailPage';
 import ResultsPage from './pages/ResultsPage';
+import ProvidersPage from './pages/ProvidersPage';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           <Route path="/" element={<Navigate to="/scans" replace />} />
           <Route path="/scans" element={<ScansPage />} />
           <Route path="/scans/:id" element={<ScanDetailPage />} />
+          <Route path="/providers" element={<ProvidersPage />} />
           <Route path="/results" element={<ResultsPage />} />
         </Routes>
       </Layout>

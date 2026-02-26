@@ -64,3 +64,61 @@ export async function listResults(params?: ResultFilterParams): Promise<ScanResu
 export async function listProviders(): Promise<Provider[]> {
   return request('/api/v1/providers');
 }
+
+// ---------------------------------------------------------------------------
+// Provider ranges
+// ---------------------------------------------------------------------------
+
+export async function getProviderRanges(providerId: string): Promise<ProviderRange[]> {
+  return request(`/api/v1/providers/${providerId}/ranges`);
+}
+
+export async function fetchProviderRanges(providerId: string): Promise<ProviderRange[]> {
+  return request(`/api/v1/providers/${providerId}/ranges/fetch`, { method: 'POST' });
+}
+
+export async function createProviderRange(
+  providerId: string, body: CreateRangeRequest,
+): Promise<ProviderRange> {
+  return request(`/api/v1/providers/${providerId}/ranges`, {
+    method: 'POST', body: JSON.stringify(body),
+  });
+}
+
+export async function updateProviderRange(
+  providerId: string, rangeId: string, body: UpdateRangeRequest,
+): Promise<ProviderRange> {
+  return request(`/api/v1/providers/${providerId}/ranges/${rangeId}`, {
+    method: 'PUT', body: JSON.stringify(body),
+  });
+}
+
+export async function deleteProviderRange(
+  providerId: string, rangeId: string,
+): Promise<void> {
+  await request(`/api/v1/providers/${providerId}/ranges/${rangeId}`, { method: 'DELETE' });
+}
+
+export async function bulkToggleRanges(
+  providerId: string, body: BulkToggleRequest,
+): Promise<void> {
+  await request(`/api/v1/providers/${providerId}/ranges/bulk`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Provider settings
+// ---------------------------------------------------------------------------
+
+export async function getProviderSettings(providerId: string): Promise<ProviderSettings> {
+  return request(`/api/v1/providers/${providerId}/settings`);
+}
+
+export async function updateProviderSettings(
+  providerId: string, body: UpdateProviderSettingsRequest,
+): Promise<ProviderSettings> {
+  return request(`/api/v1/providers/${providerId}/settings`, {
+    method: 'PUT', body: JSON.stringify(body),
+  });
+}

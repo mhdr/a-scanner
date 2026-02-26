@@ -56,6 +56,7 @@ async fn create_scan(
         samples: 3,
         extended_concurrency: 200,
         extended_timeout_ms: 10000,
+        ip_ranges: body.ip_ranges.clone(),
     };
 
     // Spawn scan as background task

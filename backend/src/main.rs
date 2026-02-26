@@ -3,7 +3,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use a_scanner_backend::{AppState, db, routes, scanner};
+use a_scanner_backend::{AppState, db, routes, scanner, services};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,6 +23,12 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::init_pool(&database_url).await?;
 
     tracing::info!("Database initialized");
+
+    // Spawn auto-update background task for provider IP ranges
+    let auto_update_pool = pool.clone();
+    tokio::spawn(async move {
+        services::provider_service::run_auto_update_loop(auto_update_pool).await;
+    });
 
     // Create shared TLS connector (reused across all scans)
     let tls_connector = scanner::create_tls_connector();

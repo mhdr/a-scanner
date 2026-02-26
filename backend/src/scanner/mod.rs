@@ -31,6 +31,9 @@ pub struct ScanConfig {
     pub extended_concurrency: usize,
     /// Timeout for extended tests in milliseconds.
     pub extended_timeout_ms: u64,
+    /// Optional explicit list of CIDR ranges to scan.
+    /// If `None`, the orchestrator reads enabled ranges from the database.
+    pub ip_ranges: Option<Vec<String>>,
 }
 
 impl Default for ScanConfig {
@@ -44,6 +47,7 @@ impl Default for ScanConfig {
             samples: 3,
             extended_concurrency: 200,
             extended_timeout_ms: 10000,
+            ip_ranges: None,
         }
     }
 }

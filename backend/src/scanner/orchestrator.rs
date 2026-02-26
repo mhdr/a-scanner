@@ -6,9 +6,12 @@ use sqlx::SqlitePool;
 use tokio_rustls::TlsConnector;
 use uuid::Uuid;
 
-use super::provider::{fetch_provider_ips, get_provider};
+use ipnet::IpNet;
+
+use super::provider::{expand_ranges, fetch_provider_ips, get_provider};
 use super::{probe_ip, run_extended_tests, setup_fd_limit, ScanConfig};
 use crate::models::ScanStatus;
+use crate::services;
 
 /// Run a full scan as a background task.
 ///
@@ -42,13 +45,34 @@ async fn run_scan_inner(
     // Update status to running
     update_scan_status(pool, scan_id, ScanStatus::Running).await?;
 
-    // Fetch and expand IP ranges
-    tracing::info!(
-        "Scan {}: fetching IP ranges for {}",
-        scan_id,
-        provider.name()
-    );
-    let ips = fetch_provider_ips(provider.as_ref()).await?;
+    // Resolve IP list: explicit ranges > DB enabled ranges > live fetch fallback
+    tracing::info!("Scan {}: resolving IP ranges for {}", scan_id, provider.name());
+    let ips = if let Some(ref cidr_list) = config.ip_ranges {
+        // Explicit ranges provided in the request
+        let mut nets: Vec<IpNet> = Vec::new();
+        for cidr in cidr_list {
+            nets.push(cidr.parse().map_err(|e| anyhow::anyhow!("Invalid CIDR '{}': {}", cidr, e))?);
+        }
+        expand_ranges(&nets, true)
+    } else {
+        // Try DB enabled ranges first
+        let db_ranges = services::provider_service::get_enabled_ranges(pool, &config.provider_id)
+            .await
+            .unwrap_or_default();
+        if db_ranges.is_empty() {
+            // Fallback: fetch live from provider URLs (first run, no ranges in DB yet)
+            tracing::info!("Scan {}: no DB ranges, fetching live", scan_id);
+            fetch_provider_ips(provider.as_ref()).await?
+        } else {
+            let mut nets: Vec<IpNet> = Vec::new();
+            for r in &db_ranges {
+                if let Ok(net) = r.cidr.parse::<IpNet>() {
+                    nets.push(net);
+                }
+            }
+            expand_ranges(&nets, true)
+        }
+    };
     let total_ips = ips.len() as i64;
 
     // Update total_ips count
