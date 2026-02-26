@@ -19,12 +19,16 @@
 a-scanner/
 ├── .github/
 │   └── copilot-instructions.md
+├── run-backend.sh               # Dev script: start backend
+├── run-frontend.sh              # Dev script: start frontend
+├── deploy.sh                    # Build single deployable executable
 ├── backend/
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── main.rs              # Entry point, Axum server setup
 │   │   ├── lib.rs               # Re-exports, app state
 │   │   ├── routes/              # Axum route handlers (one file per resource)
+│   │   │   └── static_files.rs  # Serves embedded frontend assets
 │   │   ├── models/              # Database models & domain types
 │   │   ├── db/                  # Database migrations, queries, connection pool
 │   │   ├── scanner/             # Core scanning logic (IP probing, concurrency)
@@ -183,3 +187,27 @@ The project root contains convenience scripts for development:
 
 - `run-backend.sh` — starts the Rust backend via `cargo run`
 - `run-frontend.sh` — installs npm dependencies if needed, then starts the Vite dev server
+
+## Deployment
+
+The project produces a **single self-contained executable**. The React frontend is compiled to static files and embedded into the Rust binary at build time using [`rust-embed`](https://crates.io/crates/rust-embed). This means no separate web server or static file directory is needed in production.
+
+### How it works
+
+1. The frontend is built with `npm run build`, producing `frontend/dist/`.
+2. The backend compiles with `cargo build --release`. The `rust-embed` crate embeds all files from `frontend/dist/` into the binary.
+3. At runtime, the server serves API routes under `/api/v1/` and falls back to the embedded frontend assets for all other paths (SPA routing via `index.html` fallback).
+
+### Deploy script
+
+- `deploy.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner-backend`.
+
+The resulting binary can be copied to any compatible machine and run directly:
+
+```bash
+./a-scanner-backend
+```
+
+Environment variables:
+- `DATABASE_URL` — SQLite connection string (default: `sqlite:scanner.db?mode=rwc`)
+- `LISTEN_ADDR` — Bind address (default: `0.0.0.0:3000`)

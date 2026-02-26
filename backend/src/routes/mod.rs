@@ -1,6 +1,7 @@
 pub mod providers;
 pub mod results;
 pub mod scans;
+mod static_files;
 
 use crate::AppState;
 use axum::Router;
@@ -12,4 +13,13 @@ pub fn api_router() -> Router<Arc<AppState>> {
         .nest("/api/v1/scans", scans::router())
         .nest("/api/v1/results", results::router())
         .nest("/api/v1/providers", providers::router())
+}
+
+/// Build the full application router with API routes and embedded frontend.
+pub fn app_router() -> Router<Arc<AppState>> {
+    Router::new()
+        .nest("/api/v1/scans", scans::router())
+        .nest("/api/v1/results", results::router())
+        .nest("/api/v1/providers", providers::router())
+        .fallback(static_files::static_handler)
 }

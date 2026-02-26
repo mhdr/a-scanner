@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the application router
     let app = Router::new()
-        .merge(routes::api_router())
+        .merge(routes::app_router())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
