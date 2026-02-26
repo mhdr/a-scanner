@@ -67,6 +67,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(body.error ?? `HTTP ${response.status}`);
   }
 
+  // 204 No Content — nothing to parse
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
 
