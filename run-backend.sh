@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/backend"
 
-PORT="${LISTEN_ADDR##*:}"
+PORT="${LISTEN_ADDR:+${LISTEN_ADDR##*:}}"
 PORT="${PORT:-3000}"
 
 if pid=$(lsof -ti :"$PORT" 2>/dev/null); then
@@ -11,6 +11,9 @@ if pid=$(lsof -ti :"$PORT" 2>/dev/null); then
   kill -9 $pid 2>/dev/null || true
   sleep 0.5
 fi
+
+# Ensure frontend/dist exists so rust-embed compiles even without a frontend build
+mkdir -p ../frontend/dist
 
 echo "Starting backend in development mode..."
 cargo run
