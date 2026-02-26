@@ -285,6 +285,27 @@ pub async fn test_download_speed(
     }
 }
 
+/// Quick functional verification of an IP: single TLS handshake + TTFB test.
+///
+/// Used as a lightweight filter before running the expensive extended test battery.
+/// Returns `true` only if both TLS and TTFB succeed, confirming the IP is not
+/// blocked at higher protocol layers (e.g., by GFW).
+pub async fn quick_verify_ip(
+    ip: IpAddr,
+    port: u16,
+    sni: &str,
+    timeout_ms: u64,
+    connector: &TlsConnector,
+) -> bool {
+    // TLS handshake must succeed
+    let tls_ok = test_tls_handshake(ip, port, sni, timeout_ms, connector).await;
+    if tls_ok.is_none() {
+        return false;
+    }
+    // TTFB must succeed (proves HTTP-level connectivity)
+    test_ttfb(ip, port, sni, timeout_ms, connector).await.is_some()
+}
+
 /// Run extended tests on a single IP with multiple samples for stability measurement.
 pub async fn run_extended_tests(
     ip: IpAddr,

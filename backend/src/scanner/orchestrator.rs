@@ -9,7 +9,7 @@ use uuid::Uuid;
 use ipnet::IpNet;
 
 use super::provider::{expand_ranges, fetch_provider_ips, get_provider_from_db};
-use super::{probe_ip, run_extended_tests, setup_fd_limit, ScanConfig};
+use super::{probe_ip, quick_verify_ip, run_extended_tests, setup_fd_limit, ScanConfig};
 use crate::models::ScanStatus;
 use crate::services;
 
@@ -202,13 +202,87 @@ async fn run_scan_inner(
 
     // Phase 2: Extended tests (if enabled)
     if config.extended && !reachable.is_empty() {
+        // Phase 1.5: Quick verify — filter out IPs that are TCP-reachable but
+        // blocked at TLS/HTTP layer (e.g., by GFW). This avoids wasting time
+        // running the full extended test battery on non-functional IPs.
+        let sni = provider.sni().to_string();
+        let pre_verify_count = reachable.len();
+        tracing::info!(
+            "Scan {}: starting quick verify on {} reachable IPs",
+            scan_id,
+            pre_verify_count
+        );
+
+        let connector_verify = tls_connector.clone();
+        let sni_verify = sni.clone();
+        let verify_timeout = config.timeout_ms;
+        let verify_port = config.port;
+        let pool_verify = pool.clone();
+        let scan_id_verify = scan_id.to_string();
+
+        let verified: Vec<(std::net::IpAddr, u64)> = stream::iter(reachable)
+            .map(|(ip, tcp_ms)| {
+                let connector = connector_verify.clone();
+                let sni = sni_verify.clone();
+                async move {
+                    let ok = quick_verify_ip(ip, verify_port, &sni, verify_timeout, &connector).await;
+                    (ip, tcp_ms, ok)
+                }
+            })
+            .buffer_unordered(concurrency)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .filter_map(|(ip, tcp_ms, ok)| if ok { Some((ip, tcp_ms)) } else { None })
+            .collect();
+
+        // Mark IPs that failed quick-verify as not reachable in scan_results
+        let failed_ips: Vec<String> = reachable_results
+            .lock()
+            .await
+            .iter()
+            .map(|(ip, _)| ip.to_string())
+            .filter(|ip_str| !verified.iter().any(|(vip, _)| vip.to_string() == *ip_str))
+            .collect();
+
+        if !failed_ips.is_empty() {
+            for ip_str in &failed_ips {
+                let _ = sqlx::query(
+                    "UPDATE scan_results SET is_reachable = 0 WHERE scan_id = ? AND ip = ?",
+                )
+                .bind(&scan_id_verify)
+                .bind(ip_str)
+                .execute(&pool_verify)
+                .await;
+            }
+            tracing::info!(
+                "Scan {}: marked {} IPs as unreachable (failed quick verify)",
+                scan_id,
+                failed_ips.len()
+            );
+        }
+
+        let reachable = verified;
+
+        tracing::info!(
+            "Scan {}: quick verify complete — {}/{} passed",
+            scan_id,
+            reachable.len(),
+            pre_verify_count
+        );
+
+        if reachable.is_empty() {
+            tracing::info!("Scan {}: no IPs passed quick verify, skipping Phase 2", scan_id);
+            update_scan_status(pool, scan_id, ScanStatus::Completed).await?;
+            tracing::info!("Scan {} completed successfully", scan_id);
+            return Ok(());
+        }
+
         tracing::info!(
             "Scan {}: starting Phase 2 extended tests on {} IPs",
             scan_id,
             reachable.len()
         );
-
-        let sni = provider.sni().to_string();
         let ext_timeout = config.extended_timeout_ms;
         let samples = config.samples;
         let ext_concurrency = config.extended_concurrency;
