@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a237e"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4fc3f7" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#81d4fa" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="62" fill="url(#bg)" stroke="#42a5f5" stroke-width="2"/>
+
+  <!-- Radar rings -->
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#42a5f5" stroke-width="1" opacity="0.3"/>
+  <circle cx="64" cy="64" r="34" fill="none" stroke="#42a5f5" stroke-width="1" opacity="0.25"/>
+  <circle cx="64" cy="64" r="20" fill="none" stroke="#42a5f5" stroke-width="1" opacity="0.2"/>
+
+  <!-- Crosshair lines -->
+  <line x1="64" y1="16" x2="64" y2="112" stroke="#42a5f5" stroke-width="0.8" opacity="0.2"/>
+  <line x1="16" y1="64" x2="112" y2="64" stroke="#42a5f5" stroke-width="0.8" opacity="0.2"/>
+
+  <!-- Radar sweep -->
+  <path d="M64,64 L64,16 A48,48 0 0,1 105,40 Z" fill="url(#sweep)" opacity="0.35"/>
+
+  <!-- Detected dots (scanned IPs) -->
+  <circle cx="82" cy="42" r="3" fill="#4fc3f7" opacity="0.9"/>
+  <circle cx="50" cy="78" r="2.5" fill="#4fc3f7" opacity="0.7"/>
+  <circle cx="90" cy="70" r="2" fill="#4fc3f7" opacity="0.6"/>
+  <circle cx="44" cy="48" r="2" fill="#69f0ae" opacity="0.8"/>
+
+  <!-- Alpha symbol (α) -->
+  <text x="64" y="78" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="42" font-weight="bold" fill="#e3f2fd" opacity="0.95">α</text>
+</svg>
