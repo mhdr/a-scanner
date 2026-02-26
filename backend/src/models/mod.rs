@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+/// Real-time progress event sent over WebSocket during a scan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanProgressEvent {
+    pub scan_id: String,
+    pub status: String,
+    pub scanned_ips: i64,
+    pub working_ips: i64,
+    pub total_ips: i64,
+    /// Human-readable label for the current phase.
+    pub phase: String,
+}
+
 /// Status of a scan job.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

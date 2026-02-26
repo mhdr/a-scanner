@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use futures::stream::{self, StreamExt};
 use sqlx::SqlitePool;
+use tokio::sync::broadcast;
 use tokio_rustls::TlsConnector;
 use uuid::Uuid;
 
@@ -11,7 +12,8 @@ use ipnet::IpNet;
 
 use super::provider::{expand_ranges, fetch_provider_ips, get_provider_from_db};
 use super::{probe_ip, quick_verify_ip, run_extended_tests, setup_fd_limit, ScanConfig};
-use crate::models::ScanStatus;
+use crate::models::{ScanProgressEvent, ScanStatus};
+use crate::AppState;
 use crate::services;
 
 /// In-memory representation of a scan result row, accumulated during scanning
@@ -41,13 +43,44 @@ struct PendingResult {
 pub async fn run_scan(
     scan_id: String,
     config: ScanConfig,
-    pool: SqlitePool,
-    tls_connector: Arc<TlsConnector>,
+    state: Arc<AppState>,
 ) {
-    if let Err(e) = run_scan_inner(&scan_id, &config, &pool, &tls_connector).await {
+    let tx = state.create_scan_channel(&scan_id).await;
+    let pool = &state.db;
+    let tls_connector = &state.tls_connector;
+    if let Err(e) = run_scan_inner(&scan_id, &config, pool, tls_connector, &tx).await {
         tracing::error!("Scan {} failed: {}", scan_id, e);
-        let _ = update_scan_status(&pool, &scan_id, ScanStatus::Failed).await;
+        let _ = update_scan_status(pool, &scan_id, ScanStatus::Failed).await;
+        let _ = tx.send(ScanProgressEvent {
+            scan_id: scan_id.clone(),
+            status: "failed".to_string(),
+            scanned_ips: 0,
+            working_ips: 0,
+            total_ips: 0,
+            phase: "failed".to_string(),
+        });
     }
+    state.remove_scan_channel(&scan_id).await;
+}
+
+/// Emit a progress event, ignoring send errors (no subscribers).
+fn emit_progress(
+    tx: &broadcast::Sender<ScanProgressEvent>,
+    scan_id: &str,
+    status: &str,
+    scanned_ips: i64,
+    working_ips: i64,
+    total_ips: i64,
+    phase: &str,
+) {
+    let _ = tx.send(ScanProgressEvent {
+        scan_id: scan_id.to_string(),
+        status: status.to_string(),
+        scanned_ips,
+        working_ips,
+        total_ips,
+        phase: phase.to_string(),
+    });
 }
 
 async fn run_scan_inner(
@@ -55,6 +88,7 @@ async fn run_scan_inner(
     config: &ScanConfig,
     pool: &SqlitePool,
     tls_connector: &Arc<TlsConnector>,
+    tx: &broadcast::Sender<ScanProgressEvent>,
 ) -> anyhow::Result<()> {
     // Resolve provider
     let provider = get_provider_from_db(pool, &config.provider_id)
@@ -63,6 +97,7 @@ async fn run_scan_inner(
 
     // Update status to running
     update_scan_status(pool, scan_id, ScanStatus::Running).await?;
+    emit_progress(tx, scan_id, "running", 0, 0, 0, "resolving");
 
     // Resolve IP list: explicit ranges > DB enabled ranges > live fetch fallback
     tracing::info!("Scan {}: resolving IP ranges for {}", scan_id, provider.name());
@@ -102,6 +137,7 @@ async fn run_scan_inner(
         .execute(pool)
         .await?;
 
+    emit_progress(tx, scan_id, "running", 0, 0, total_ips, "phase1");
     tracing::info!("Scan {}: starting Phase 1 with {} IPs", scan_id, total_ips);
 
     // Raise file descriptor limit for high concurrency
@@ -133,6 +169,9 @@ async fn run_scan_inner(
     let port = config.port;
     let timeout_ms = config.timeout_ms;
     let scan_id_owned = scan_id.to_string();
+    let tx_clone = tx.clone();
+    // Emit progress every N IPs (at least every 1% or every 50 IPs)
+    let progress_interval = (total_ips as u64 / 100).max(50);
 
     stream::iter(ips)
         .map(|ip| {
@@ -140,10 +179,11 @@ async fn run_scan_inner(
             let reachable = reachable_results.clone();
             let results_map = all_results.clone();
             let scan_id = scan_id_owned.clone();
+            let tx = tx_clone.clone();
 
             async move {
                 let result = probe_ip(ip, port, timeout_ms).await;
-                scanned.fetch_add(1, Ordering::Relaxed);
+                let count = scanned.fetch_add(1, Ordering::Relaxed) + 1;
 
                 let latency_ms = result.latency.map(|d| d.as_millis() as i64);
 
@@ -169,8 +209,10 @@ async fn run_scan_inner(
                 };
                 results_map.lock().await.insert(ip_str, row);
 
-                // Periodically update scanned_ips progress (lightweight single-row UPDATE)
-                let _scan_id = scan_id;
+                // Emit progress periodically to avoid flooding WS clients
+                if count % progress_interval == 0 || count == total_ips as u64 {
+                    emit_progress(&tx, &scan_id, "running", count as i64, 0, total_ips, "phase1");
+                }
             }
         })
         .buffer_unordered(concurrency)
@@ -201,6 +243,7 @@ async fn run_scan_inner(
     if let Err(e) = services::scan_service::update_working_ips(pool, scan_id, working_count).await {
         tracing::warn!("Scan {}: failed to update working_ips: {}", scan_id, e);
     }
+    emit_progress(tx, scan_id, "running", total_ips, working_count, total_ips, "phase1_done");
 
     // Phase 2: Extended tests (if enabled)
     if config.extended && !reachable.is_empty() {
@@ -276,6 +319,7 @@ async fn run_scan_inner(
         if let Err(e) = services::scan_service::update_working_ips(pool, scan_id, verified_count).await {
             tracing::warn!("Scan {}: failed to update working_ips after quick verify: {}", scan_id, e);
         }
+        emit_progress(tx, scan_id, "running", total_ips, verified_count, total_ips, "quick_verify_done");
 
         if reachable.is_empty() {
             tracing::info!("Scan {}: no IPs passed quick verify, skipping Phase 2", scan_id);
@@ -287,6 +331,7 @@ async fn run_scan_inner(
             return Ok(());
         }
 
+        emit_progress(tx, scan_id, "running", total_ips, verified_count, total_ips, "phase2");
         tracing::info!(
             "Scan {}: starting Phase 2 extended tests on {} IPs",
             scan_id,
@@ -351,6 +396,11 @@ async fn run_scan_inner(
 
     // Mark scan as completed
     update_scan_status(pool, scan_id, ScanStatus::Completed).await?;
+    let final_working = services::scan_service::get_scan(pool, scan_id)
+        .await
+        .map(|s| s.working_ips)
+        .unwrap_or(0);
+    emit_progress(tx, scan_id, "completed", total_ips, final_working, total_ips, "done");
     tracing::info!("Scan {} completed successfully", scan_id);
 
     Ok(())

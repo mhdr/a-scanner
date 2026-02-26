@@ -97,6 +97,17 @@ export interface ApiError {
   error: string;
 }
 
+/// Real-time scan progress event received over WebSocket.
+export interface ScanProgressEvent {
+  scan_id: string;
+  status: ScanStatus;
+  scanned_ips: number;
+  working_ips: number;
+  total_ips: number;
+  /** Current scan phase label. */
+  phase: string;
+}
+
 /// Paginated API response wrapper.
 export interface PaginatedResponse<T> {
   data: T[];

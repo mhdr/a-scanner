@@ -67,12 +67,11 @@ async fn create_scan(
     };
 
     // Spawn scan as background task
-    let pool = state.db.clone();
-    let tls_connector = state.tls_connector.clone();
     let scan_id = scan.id.clone();
+    let state_clone = state.clone();
 
     tokio::spawn(async move {
-        run_scan(scan_id, config, pool, tls_connector).await;
+        run_scan(scan_id, config, state_clone).await;
     });
 
     Ok((axum::http::StatusCode::CREATED, Json(scan)))

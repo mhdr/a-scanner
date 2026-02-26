@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -15,6 +15,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useScanStore } from '../stores/scanStore';
+import { useScanProgress } from '../hooks/useScanProgress';
 import type { ScanStatus } from '../types';
 
 const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error'> = {
@@ -103,7 +104,6 @@ export default function ScanDetailPage() {
     currentScan, currentResults, resultsTotal, resultsPage, resultsPageSize,
     isLoading, error, fetchScan, fetchScanResults, setResultsPagination,
   } = useScanStore();
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshData = useCallback(() => {
     if (id) {
@@ -122,22 +122,9 @@ export default function ScanDetailPage() {
     if (id) fetchScanResults(id);
   }, [id, resultsPage, resultsPageSize, fetchScanResults]);
 
-  // Polling: refresh every 2s while scan is pending or running
-  useEffect(() => {
-    const status = currentScan?.status;
-    if (status === 'pending' || status === 'running') {
-      intervalRef.current = setInterval(refreshData, 2000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [currentScan?.status, refreshData]);
+  // Real-time progress via WebSocket (falls back to polling on disconnect)
+  const isActive = currentScan?.status === 'pending' || currentScan?.status === 'running';
+  useScanProgress(id, isActive);
 
   const progress =
     currentScan && currentScan.total_ips > 0
