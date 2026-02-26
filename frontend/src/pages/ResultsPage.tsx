@@ -1,14 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Box,
+  Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControlLabel,
   Switch,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -98,7 +105,18 @@ export default function ResultsPage() {
   const {
     results, total, page, pageSize, isLoading, error,
     reachableOnly, setReachableOnly, setPagination, fetchResults,
+    deleteAllResults,
   } = useResultStore();
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    await deleteAllResults();
+    setDeleting(false);
+    setConfirmOpen(false);
+  };
 
   useEffect(() => {
     fetchResults();
@@ -118,18 +136,47 @@ export default function ResultsPage() {
 
       <Card>
         <CardContent>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={reachableOnly}
-                onChange={(e) => {
-                  setReachableOnly(e.target.checked);
-                }}
-              />
-            }
-            label="Show reachable only"
-            sx={{ mb: 2 }}
-          />
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={reachableOnly}
+                  onChange={(e) => {
+                    setReachableOnly(e.target.checked);
+                  }}
+                />
+              }
+              label="Show reachable only"
+            />
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteSweepIcon />}
+              onClick={() => setConfirmOpen(true)}
+              disabled={deleting || total === 0}
+              size={isMobile ? 'small' : 'medium'}
+            >
+              Delete All
+            </Button>
+          </Box>
+
+          <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+            <DialogTitle>Delete all results?</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                This will permanently delete all completed scans and their results.
+                Running scans will not be affected.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmOpen(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button onClick={handleDeleteAll} color="error" variant="contained" disabled={deleting}>
+                {deleting ? 'Deleting…' : 'Delete All'}
+              </Button>
+            </DialogActions>
+          </Dialog>
           <DataGrid
             rows={results}
             columns={columns}

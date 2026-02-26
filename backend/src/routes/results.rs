@@ -4,6 +4,7 @@ use axum::{
     Json,
     Router,
     extract::{Query, State},
+    http::StatusCode,
     routing::get,
 };
 use serde::Deserialize;
@@ -14,7 +15,7 @@ use crate::models::{PaginatedResponse, ScanResult};
 use crate::services;
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/", get(list_results))
+    Router::new().route("/", get(list_results).delete(delete_all_results))
 }
 
 #[derive(Debug, Deserialize)]
@@ -23,6 +24,14 @@ pub struct ResultFilterParams {
     pub per_page: Option<u32>,
     pub reachable_only: Option<bool>,
     pub provider: Option<String>,
+}
+
+/// DELETE /api/v1/results — delete all completed/failed scans and their results.
+async fn delete_all_results(
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, AppError> {
+    services::scan_service::delete_all_completed_scans(&state.db).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// GET /api/v1/results — list all scan results with optional filtering.

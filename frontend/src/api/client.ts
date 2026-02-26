@@ -111,6 +111,10 @@ export async function listResults(params?: ResultFilterParams): Promise<Paginate
   return request(`/api/v1/results${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 
+export async function deleteAllResults(): Promise<void> {
+  await request('/api/v1/results', { method: 'DELETE' });
+}
+
 // --- Providers ---
 
 export async function listProviders(): Promise<Provider[]> {

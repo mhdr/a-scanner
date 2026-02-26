@@ -89,6 +89,18 @@ pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> R
     Ok(())
 }
 
+/// Delete all completed/failed scans and their results.
+/// Running and pending scans are left untouched.
+/// Returns the number of deleted scans (results are cascade-deleted).
+pub async fn delete_all_completed_scans(db: &SqlitePool) -> Result<u64, AppError> {
+    let result = sqlx::query(
+        "DELETE FROM scans WHERE status NOT IN ('running', 'pending')",
+    )
+    .execute(db)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 /// Count results for a specific scan.
 pub async fn count_scan_results(db: &SqlitePool, scan_id: &str) -> Result<i64, AppError> {
     let row: (i64,) = sqlx::query_as(

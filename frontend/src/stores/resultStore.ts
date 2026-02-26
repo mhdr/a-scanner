@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ScanResult } from '../types';
-import { listResults } from '../api';
+import { listResults, deleteAllResults as apiDeleteAllResults } from '../api';
 
 interface ResultState {
   results: ScanResult[];
@@ -13,6 +13,7 @@ interface ResultState {
   setReachableOnly: (value: boolean) => void;
   setPagination: (page: number, pageSize: number) => void;
   fetchResults: () => Promise<void>;
+  deleteAllResults: () => Promise<void>;
 }
 
 export const useResultStore = create<ResultState>((set, get) => ({
@@ -46,6 +47,18 @@ export const useResultStore = create<ResultState>((set, get) => ({
       set({ results: resp.data, total: resp.total, isLoading: false });
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
+    }
+  },
+
+  deleteAllResults: async () => {
+    set({ error: null });
+    try {
+      await apiDeleteAllResults();
+      set({ results: [], total: 0, page: 0 });
+      // Re-fetch to reflect any remaining results (from running scans)
+      await get().fetchResults();
+    } catch (err) {
+      set({ error: (err as Error).message });
     }
   },
 }));
