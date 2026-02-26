@@ -5,15 +5,20 @@ import {
   Card,
   CardContent,
   Chip,
+  Collapse,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
   Stack,
+  Switch,
+  TextField,
   Typography,
 } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate } from 'react-router-dom';
 import { useScanStore } from '../stores/scanStore';
 import { useProviderStore } from '../stores/providerStore';
@@ -42,6 +47,19 @@ const columns: GridColDef[] = [
       />
     ),
   },
+  {
+    field: 'mode',
+    headerName: 'Mode',
+    width: 100,
+    renderCell: (params) => (
+      <Chip
+        label={params.value}
+        variant="outlined"
+        size="small"
+        color={params.value === 'extended' ? 'secondary' : 'default'}
+      />
+    ),
+  },
   { field: 'total_ips', headerName: 'Total IPs', width: 110, type: 'number' },
   { field: 'scanned_ips', headerName: 'Scanned', width: 110, type: 'number' },
   { field: 'created_at', headerName: 'Created', width: 200 },
@@ -52,6 +70,10 @@ export default function ScansPage() {
   const { scans, isLoading, error, fetchScans, startScan } = useScanStore();
   const { providers, fetchProviders } = useProviderStore();
   const [selectedProvider, setSelectedProvider] = useState('cloudflare');
+  const [extended, setExtended] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [concurrency, setConcurrency] = useState(64);
+  const [timeoutMs, setTimeoutMs] = useState(2000);
 
   useEffect(() => {
     fetchScans();
@@ -59,7 +81,17 @@ export default function ScansPage() {
   }, [fetchScans, fetchProviders]);
 
   const handleStartScan = async () => {
-    await startScan(selectedProvider);
+    await startScan({
+      provider: selectedProvider,
+      extended,
+      concurrency,
+      timeout_ms: timeoutMs,
+    });
+    // Navigate to the newly created scan
+    const { scans: updatedScans } = useScanStore.getState();
+    if (updatedScans.length > 0) {
+      navigate(`/scans/${updatedScans[0].id}`);
+    }
   };
 
   return (
@@ -81,6 +113,20 @@ export default function ScansPage() {
               ))}
             </Select>
           </FormControl>
+          <FormControlLabel
+            control={
+              <Switch checked={extended} onChange={(e) => setExtended(e.target.checked)} />
+            }
+            label="Extended"
+          />
+          <Button
+            size="small"
+            startIcon={<SettingsIcon />}
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            variant="text"
+          >
+            Advanced
+          </Button>
           <Button
             variant="contained"
             startIcon={<PlayArrowIcon />}
@@ -91,6 +137,33 @@ export default function ScansPage() {
           </Button>
         </Stack>
       </Stack>
+
+      <Collapse in={showAdvanced}>
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Stack direction="row" spacing={3}>
+              <TextField
+                label="Concurrency"
+                type="number"
+                size="small"
+                value={concurrency}
+                onChange={(e) => setConcurrency(Number(e.target.value))}
+                slotProps={{ htmlInput: { min: 1, max: 10000 } }}
+                sx={{ width: 140 }}
+              />
+              <TextField
+                label="Timeout (ms)"
+                type="number"
+                size="small"
+                value={timeoutMs}
+                onChange={(e) => setTimeoutMs(Number(e.target.value))}
+                slotProps={{ htmlInput: { min: 100, max: 30000, step: 100 } }}
+                sx={{ width: 140 }}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+      </Collapse>
 
       {error && (
         <Typography color="error" sx={{ mb: 2 }}>

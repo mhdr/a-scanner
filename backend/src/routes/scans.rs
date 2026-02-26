@@ -10,7 +10,9 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{Scan, ScanResult};
+use crate::models::{CreateScanRequest, Scan, ScanResult};
+use crate::scanner::ScanConfig;
+use crate::scanner::orchestrator::run_scan;
 use crate::services;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -24,11 +26,6 @@ pub fn router() -> Router<Arc<AppState>> {
 pub struct PaginationParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateScanRequest {
-    pub provider: String,
 }
 
 /// GET /api/v1/scans — list all scans with pagination.
@@ -47,7 +44,29 @@ async fn create_scan(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateScanRequest>,
 ) -> Result<(axum::http::StatusCode, Json<Scan>), AppError> {
-    let scan = services::scan_service::create_scan(&state.db, &body.provider).await?;
+    let scan = services::scan_service::create_scan(&state.db, &body).await?;
+
+    // Build scan config from request
+    let config = ScanConfig {
+        provider_id: body.provider.clone(),
+        concurrency: body.concurrency.unwrap_or(64) as usize,
+        timeout_ms: body.timeout_ms.unwrap_or(2000) as u64,
+        port: 443,
+        extended: body.extended,
+        samples: 3,
+        extended_concurrency: 200,
+        extended_timeout_ms: 10000,
+    };
+
+    // Spawn scan as background task
+    let pool = state.db.clone();
+    let tls_connector = state.tls_connector.clone();
+    let scan_id = scan.id.clone();
+
+    tokio::spawn(async move {
+        run_scan(scan_id, config, pool, tls_connector).await;
+    });
+
     Ok((axum::http::StatusCode::CREATED, Json(scan)))
 }
 

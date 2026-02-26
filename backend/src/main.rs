@@ -3,10 +3,15 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use a_scanner_backend::{AppState, db, routes};
+use a_scanner_backend::{AppState, db, routes, scanner};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Install the ring crypto provider for rustls before any TLS operations
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
@@ -19,8 +24,11 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Database initialized");
 
+    // Create shared TLS connector (reused across all scans)
+    let tls_connector = scanner::create_tls_connector();
+
     // Build shared state
-    let state = AppState::new(pool);
+    let state = AppState::new(pool, tls_connector);
 
     // CORS layer for development
     let cors = CorsLayer::new()

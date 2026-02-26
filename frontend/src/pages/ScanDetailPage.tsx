@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   Chip,
+  LinearProgress,
   Stack,
   Typography,
 } from '@mui/material';
@@ -23,12 +24,12 @@ const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error'> 
   failed: 'error',
 };
 
-const resultColumns: GridColDef[] = [
+const basicColumns: GridColDef[] = [
   { field: 'ip', headerName: 'IP Address', width: 200 },
   {
     field: 'is_reachable',
     headerName: 'Reachable',
-    width: 130,
+    width: 110,
     renderCell: (params) =>
       params.value ? (
         <CheckCircleIcon color="success" />
@@ -38,12 +39,53 @@ const resultColumns: GridColDef[] = [
   },
   {
     field: 'latency_ms',
-    headerName: 'Latency (ms)',
-    width: 140,
+    headerName: 'TCP (ms)',
+    width: 110,
     type: 'number',
-    renderCell: (params) => (params.value != null ? `${params.value} ms` : '—'),
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
   },
-  { field: 'created_at', headerName: 'Tested At', width: 200 },
+];
+
+const extendedColumns: GridColDef[] = [
+  ...basicColumns,
+  {
+    field: 'tls_latency_ms',
+    headerName: 'TLS (ms)',
+    width: 110,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+  },
+  {
+    field: 'ttfb_ms',
+    headerName: 'TTFB (ms)',
+    width: 110,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+  },
+  {
+    field: 'download_speed_kbps',
+    headerName: 'Speed (KB/s)',
+    width: 130,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
+  },
+  {
+    field: 'jitter_ms',
+    headerName: 'Jitter (ms)',
+    width: 110,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
+  },
+  {
+    field: 'score',
+    headerName: 'Score',
+    width: 110,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(0)}` : '—',
+  },
 ];
 
 export default function ScanDetailPage() {
@@ -51,13 +93,44 @@ export default function ScanDetailPage() {
   const navigate = useNavigate();
   const { currentScan, currentResults, isLoading, error, fetchScan, fetchScanResults } =
     useScanStore();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const refreshData = useCallback(() => {
     if (id) {
       fetchScan(id);
       fetchScanResults(id);
     }
   }, [id, fetchScan, fetchScanResults]);
+
+  // Initial fetch
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  // Polling: refresh every 2s while scan is pending or running
+  useEffect(() => {
+    const status = currentScan?.status;
+    if (status === 'pending' || status === 'running') {
+      intervalRef.current = setInterval(refreshData, 2000);
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [currentScan?.status, refreshData]);
+
+  const progress =
+    currentScan && currentScan.total_ips > 0
+      ? (currentScan.scanned_ips / currentScan.total_ips) * 100
+      : 0;
+
+  const isExtended = currentScan?.extended ?? false;
+  const columns = isExtended ? extendedColumns : basicColumns;
 
   return (
     <Box>
@@ -85,10 +158,29 @@ export default function ScanDetailPage() {
                   color={statusColor[currentScan.status as ScanStatus] ?? 'default'}
                   size="small"
                 />
+                <Chip
+                  label={currentScan.mode}
+                  variant="outlined"
+                  size="small"
+                  color={currentScan.extended ? 'secondary' : 'default'}
+                />
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {currentScan.scanned_ips} / {currentScan.total_ips} IPs scanned
+                {' | '}Concurrency: {currentScan.concurrency}
+                {' | '}Timeout: {currentScan.timeout_ms}ms
               </Typography>
+              {(currentScan.status === 'pending' || currentScan.status === 'running') && (
+                <Box sx={{ mt: 1 }}>
+                  <LinearProgress
+                    variant={currentScan.total_ips > 0 ? 'determinate' : 'indeterminate'}
+                    value={progress}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {progress.toFixed(1)}%
+                  </Typography>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary">
                 Created: {currentScan.created_at}
               </Typography>
@@ -100,11 +192,11 @@ export default function ScanDetailPage() {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Results
+            Results {currentResults.length > 0 && `(${currentResults.length} reachable)`}
           </Typography>
           <DataGrid
             rows={currentResults}
-            columns={resultColumns}
+            columns={columns}
             pageSizeOptions={[10, 25, 50]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             loading={isLoading}

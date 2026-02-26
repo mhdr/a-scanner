@@ -13,11 +13,11 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import { useResultStore } from '../stores/resultStore';
 
 const columns: GridColDef[] = [
-  { field: 'ip', headerName: 'IP Address', width: 200 },
+  { field: 'ip', headerName: 'IP Address', width: 180 },
   {
     field: 'is_reachable',
     headerName: 'Reachable',
-    width: 130,
+    width: 100,
     renderCell: (params) =>
       params.value ? (
         <CheckCircleIcon color="success" />
@@ -27,13 +27,50 @@ const columns: GridColDef[] = [
   },
   {
     field: 'latency_ms',
-    headerName: 'Latency (ms)',
-    width: 140,
+    headerName: 'TCP (ms)',
+    width: 100,
     type: 'number',
-    renderCell: (params) => (params.value != null ? `${params.value} ms` : '—'),
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+  },
+  {
+    field: 'tls_latency_ms',
+    headerName: 'TLS (ms)',
+    width: 100,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+  },
+  {
+    field: 'ttfb_ms',
+    headerName: 'TTFB (ms)',
+    width: 100,
+    type: 'number',
+    renderCell: (params) => (params.value != null ? `${params.value}` : '—'),
+  },
+  {
+    field: 'download_speed_kbps',
+    headerName: 'Speed (KB/s)',
+    width: 120,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
+  },
+  {
+    field: 'jitter_ms',
+    headerName: 'Jitter (ms)',
+    width: 100,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(1)}` : '—',
+  },
+  {
+    field: 'score',
+    headerName: 'Score',
+    width: 100,
+    type: 'number',
+    renderCell: (params) =>
+      params.value != null ? `${(params.value as number).toFixed(0)}` : '—',
   },
   { field: 'scan_id', headerName: 'Scan ID', width: 280 },
-  { field: 'created_at', headerName: 'Tested At', width: 200 },
 ];
 
 export default function ResultsPage() {

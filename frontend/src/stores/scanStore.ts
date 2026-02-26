@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Scan, ScanResult } from '../types';
+import type { Scan, ScanResult, CreateScanRequest } from '../types';
 import { listScans, createScan, getScan, getScanResults } from '../api';
 
 interface ScanState {
@@ -11,7 +11,7 @@ interface ScanState {
   fetchScans: () => Promise<void>;
   fetchScan: (id: string) => Promise<void>;
   fetchScanResults: (id: string) => Promise<void>;
-  startScan: (provider: string) => Promise<void>;
+  startScan: (req: CreateScanRequest) => Promise<void>;
 }
 
 export const useScanStore = create<ScanState>((set) => ({
@@ -51,10 +51,10 @@ export const useScanStore = create<ScanState>((set) => ({
     }
   },
 
-  startScan: async (provider: string) => {
+  startScan: async (req: CreateScanRequest) => {
     set({ isLoading: true, error: null });
     try {
-      const scan = await createScan({ provider });
+      const scan = await createScan(req);
       set((state) => ({
         scans: [scan, ...state.scans],
         isLoading: false,

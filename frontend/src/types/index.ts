@@ -10,6 +10,11 @@ export interface Scan {
   scanned_ips: number;
   created_at: string;
   updated_at: string;
+  mode: string;
+  concurrency: number;
+  timeout_ms: number;
+  port: number;
+  extended: boolean;
 }
 
 /// A single scan result.
@@ -20,6 +25,12 @@ export interface ScanResult {
   latency_ms: number | null;
   is_reachable: boolean;
   created_at: string;
+  tls_latency_ms: number | null;
+  ttfb_ms: number | null;
+  download_speed_kbps: number | null;
+  jitter_ms: number | null;
+  success_rate: number | null;
+  score: number | null;
 }
 
 /// Supported CDN provider.
@@ -38,6 +49,9 @@ export interface PaginationParams {
 /// Parameters for creating a new scan.
 export interface CreateScanRequest {
   provider: string;
+  extended?: boolean;
+  concurrency?: number;
+  timeout_ms?: number;
 }
 
 /// Result filter parameters.

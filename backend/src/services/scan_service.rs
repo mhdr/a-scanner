@@ -2,7 +2,7 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::AppError;
-use crate::models::{Scan, ScanResult, ScanStatus};
+use crate::models::{CreateScanRequest, Scan, ScanResult, ScanStatus};
 
 /// List scans with pagination.
 pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec<Scan>, AppError> {
@@ -10,7 +10,8 @@ pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec
     let limit = per_page as i64;
 
     let scans = sqlx::query_as::<_, Scan>(
-        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at
+        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+                mode, concurrency, timeout_ms, port, extended
          FROM scans
          ORDER BY created_at DESC
          LIMIT ? OFFSET ?",
@@ -23,21 +24,29 @@ pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec
     Ok(scans)
 }
 
-/// Create a new scan record.
-pub async fn create_scan(db: &SqlitePool, provider: &str) -> Result<Scan, AppError> {
+/// Create a new scan record and return it.
+pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Scan, AppError> {
     let id = Uuid::new_v4().to_string();
     let status = ScanStatus::Pending.as_str();
     let now = chrono::Utc::now().to_rfc3339();
+    let concurrency = req.concurrency.unwrap_or(64);
+    let timeout_ms = req.timeout_ms.unwrap_or(2000);
+    let mode = if req.extended { "extended" } else { "basic" };
 
     sqlx::query(
-        "INSERT INTO scans (id, provider, status, total_ips, scanned_ips, created_at, updated_at)
-         VALUES (?, ?, ?, 0, 0, ?, ?)",
+        "INSERT INTO scans (id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+                            mode, concurrency, timeout_ms, port, extended)
+         VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, 443, ?)",
     )
     .bind(&id)
-    .bind(provider)
+    .bind(&req.provider)
     .bind(status)
     .bind(&now)
     .bind(&now)
+    .bind(mode)
+    .bind(concurrency)
+    .bind(timeout_ms)
+    .bind(req.extended)
     .execute(db)
     .await?;
 
@@ -47,7 +56,8 @@ pub async fn create_scan(db: &SqlitePool, provider: &str) -> Result<Scan, AppErr
 /// Get a single scan by ID.
 pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
     let scan = sqlx::query_as::<_, Scan>(
-        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at
+        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+                mode, concurrency, timeout_ms, port, extended
          FROM scans WHERE id = ?",
     )
     .bind(id)
@@ -69,10 +79,11 @@ pub async fn get_scan_results(
     let limit = per_page as i64;
 
     let results = sqlx::query_as::<_, ScanResult>(
-        "SELECT id, scan_id, ip, latency_ms, is_reachable, created_at
+        "SELECT id, scan_id, ip, latency_ms, is_reachable, created_at,
+                tls_latency_ms, ttfb_ms, download_speed_kbps, jitter_ms, success_rate, score
          FROM scan_results
-         WHERE scan_id = ?
-         ORDER BY latency_ms ASC NULLS LAST
+         WHERE scan_id = ? AND is_reachable = 1
+         ORDER BY CASE WHEN score IS NOT NULL THEN score ELSE latency_ms END ASC NULLS LAST
          LIMIT ? OFFSET ?",
     )
     .bind(scan_id)

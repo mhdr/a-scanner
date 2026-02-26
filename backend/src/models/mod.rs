@@ -42,6 +42,11 @@ pub struct Scan {
     pub scanned_ips: i64,
     pub created_at: String,
     pub updated_at: String,
+    pub mode: String,
+    pub concurrency: i64,
+    pub timeout_ms: i64,
+    pub port: i64,
+    pub extended: bool,
 }
 
 /// A single scan result row from the database.
@@ -53,6 +58,12 @@ pub struct ScanResult {
     pub latency_ms: Option<i64>,
     pub is_reachable: bool,
     pub created_at: String,
+    pub tls_latency_ms: Option<i64>,
+    pub ttfb_ms: Option<i64>,
+    pub download_speed_kbps: Option<f64>,
+    pub jitter_ms: Option<f64>,
+    pub success_rate: Option<f64>,
+    pub score: Option<f64>,
 }
 
 /// Supported CDN provider.
@@ -61,4 +72,14 @@ pub struct Provider {
     pub id: String,
     pub name: String,
     pub description: String,
+}
+
+/// Request body for creating a new scan.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateScanRequest {
+    pub provider: String,
+    #[serde(default)]
+    pub extended: bool,
+    pub concurrency: Option<i64>,
+    pub timeout_ms: Option<i64>,
 }
