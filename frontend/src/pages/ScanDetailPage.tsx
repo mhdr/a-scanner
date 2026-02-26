@@ -10,7 +10,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -99,8 +99,10 @@ const extendedColumns: GridColDef[] = [
 export default function ScanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentScan, currentResults, isLoading, error, fetchScan, fetchScanResults } =
-    useScanStore();
+  const {
+    currentScan, currentResults, resultsTotal, resultsPage, resultsPageSize,
+    isLoading, error, fetchScan, fetchScanResults, setResultsPagination,
+  } = useScanStore();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshData = useCallback(() => {
@@ -114,6 +116,11 @@ export default function ScanDetailPage() {
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Re-fetch when pagination changes
+  useEffect(() => {
+    if (id) fetchScanResults(id);
+  }, [id, resultsPage, resultsPageSize, fetchScanResults]);
 
   // Polling: refresh every 2s while scan is pending or running
   useEffect(() => {
@@ -200,16 +207,19 @@ export default function ScanDetailPage() {
       <Card>
         <CardContent>
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Results {currentResults.length > 0 && `(${currentResults.length} reachable)`}
+            Results {resultsTotal > 0 && `(${resultsTotal} reachable)`}
           </Typography>
           <DataGrid
             rows={currentResults}
             columns={columns}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 25 } },
-              sorting: { sortModel: [{ field: isExtended ? 'score' : 'latency_ms', sort: 'asc' }] },
+            paginationMode="server"
+            rowCount={resultsTotal}
+            paginationModel={{ page: resultsPage, pageSize: resultsPageSize }}
+            onPaginationModelChange={(model: GridPaginationModel) => {
+              setResultsPagination(model.page, model.pageSize);
             }}
+            pageSizeOptions={[10, 25, 50, 100]}
+            sortingMode="server"
             loading={isLoading}
             autoHeight
             disableRowSelectionOnClick

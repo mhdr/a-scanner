@@ -7,7 +7,7 @@ import {
   Switch,
   Typography,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useResultStore } from '../stores/resultStore';
@@ -82,12 +82,14 @@ const columns: GridColDef[] = [
 ];
 
 export default function ResultsPage() {
-  const { results, isLoading, error, reachableOnly, setReachableOnly, fetchResults } =
-    useResultStore();
+  const {
+    results, total, page, pageSize, isLoading, error,
+    reachableOnly, setReachableOnly, setPagination, fetchResults,
+  } = useResultStore();
 
   useEffect(() => {
     fetchResults();
-  }, [fetchResults, reachableOnly]);
+  }, [fetchResults, reachableOnly, page, pageSize]);
 
   return (
     <Box>
@@ -118,11 +120,14 @@ export default function ResultsPage() {
           <DataGrid
             rows={results}
             columns={columns}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 25 } },
-              sorting: { sortModel: [{ field: 'score', sort: 'asc' }] },
+            paginationMode="server"
+            rowCount={total}
+            paginationModel={{ page, pageSize }}
+            onPaginationModelChange={(model: GridPaginationModel) => {
+              setPagination(model.page, model.pageSize);
             }}
+            pageSizeOptions={[10, 25, 50, 100]}
+            sortingMode="server"
             loading={isLoading}
             autoHeight
             disableRowSelectionOnClick

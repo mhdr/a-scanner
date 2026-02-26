@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{CreateScanRequest, Scan, ScanResult};
+use crate::models::{CreateScanRequest, PaginatedResponse, Scan, ScanResult};
 use crate::scanner::ScanConfig;
 use crate::scanner::orchestrator::run_scan;
 use crate::services;
@@ -32,11 +32,17 @@ pub struct PaginationParams {
 async fn list_scans(
     State(state): State<Arc<AppState>>,
     Query(params): Query<PaginationParams>,
-) -> Result<Json<Vec<Scan>>, AppError> {
+) -> Result<Json<PaginatedResponse<Scan>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
+    let total = services::scan_service::count_scans(&state.db).await?;
     let scans = services::scan_service::list_scans(&state.db, page, per_page).await?;
-    Ok(Json(scans))
+    Ok(Json(PaginatedResponse {
+        data: scans,
+        total,
+        page,
+        per_page,
+    }))
 }
 
 /// POST /api/v1/scans — create and start a new scan.
@@ -86,10 +92,16 @@ async fn get_scan_results(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
     Query(params): Query<PaginationParams>,
-) -> Result<Json<Vec<ScanResult>>, AppError> {
+) -> Result<Json<PaginatedResponse<ScanResult>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
+    let total = services::scan_service::count_scan_results(&state.db, &id).await?;
     let results =
         services::scan_service::get_scan_results(&state.db, &id, page, per_page).await?;
-    Ok(Json(results))
+    Ok(Json(PaginatedResponse {
+        data: results,
+        total,
+        page,
+        per_page,
+    }))
 }

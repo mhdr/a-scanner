@@ -4,6 +4,14 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::models::{CreateScanRequest, Scan, ScanResult, ScanStatus};
 
+/// Count total scans.
+pub async fn count_scans(db: &SqlitePool) -> Result<i64, AppError> {
+    let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM scans")
+        .fetch_one(db)
+        .await?;
+    Ok(row.0)
+}
+
 /// List scans with pagination.
 pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec<Scan>, AppError> {
     let offset = ((page - 1) * per_page) as i64;
@@ -68,6 +76,17 @@ pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
     .ok_or_else(|| AppError::NotFound(format!("Scan {id} not found")))?;
 
     Ok(scan)
+}
+
+/// Count results for a specific scan.
+pub async fn count_scan_results(db: &SqlitePool, scan_id: &str) -> Result<i64, AppError> {
+    let row: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM scan_results WHERE scan_id = ? AND is_reachable = 1",
+    )
+    .bind(scan_id)
+    .fetch_one(db)
+    .await?;
+    Ok(row.0)
 }
 
 /// Get results for a specific scan with pagination.

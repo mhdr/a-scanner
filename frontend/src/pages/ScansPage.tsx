@@ -18,7 +18,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { DataGrid, type GridColDef } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data-grid';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate, Link } from 'react-router-dom';
@@ -69,7 +69,10 @@ const columns: GridColDef[] = [
 
 export default function ScansPage() {
   const navigate = useNavigate();
-  const { scans, isLoading, error, fetchScans, startScan } = useScanStore();
+  const {
+    scans, scansTotal, scansPage, scansPageSize,
+    isLoading, error, fetchScans, startScan, setScansPagination,
+  } = useScanStore();
   const { providers, fetchProviders, ranges, fetchRanges } = useProviderStore();
   const [selectedProvider, setSelectedProvider] = useState('cloudflare');
   const [extended, setExtended] = useState(false);
@@ -87,6 +90,11 @@ export default function ScansPage() {
     fetchScans();
     fetchProviders();
   }, [fetchScans, fetchProviders]);
+
+  // Re-fetch when pagination changes
+  useEffect(() => {
+    fetchScans();
+  }, [scansPage, scansPageSize, fetchScans]);
 
   // Load ranges when provider changes
   useEffect(() => {
@@ -300,8 +308,13 @@ export default function ScansPage() {
           <DataGrid
             rows={scans}
             columns={columns}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+            paginationMode="server"
+            rowCount={scansTotal}
+            paginationModel={{ page: scansPage, pageSize: scansPageSize }}
+            onPaginationModelChange={(model: GridPaginationModel) => {
+              setScansPagination(model.page, model.pageSize);
+            }}
+            pageSizeOptions={[10, 25, 50, 100]}
             onRowClick={(params) => navigate(`/scans/${params.id}`)}
             loading={isLoading}
             autoHeight

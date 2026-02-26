@@ -123,6 +123,15 @@ pub struct ProviderSettings {
     pub last_fetched_at: Option<String>,
 }
 
+/// Generic paginated response wrapper.
+#[derive(Debug, Clone, Serialize)]
+pub struct PaginatedResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub page: u32,
+    pub per_page: u32,
+}
+
 /// Request body for creating a new scan.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateScanRequest {

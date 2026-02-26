@@ -3,6 +3,7 @@ import type {
   CreateRangeRequest,
   CreateScanRequest,
   BulkToggleRequest,
+  PaginatedResponse,
   PaginationParams,
   Provider,
   ProviderRange,
@@ -39,7 +40,7 @@ function toQuery(params: Record<string, unknown>): string {
 
 // --- Scans ---
 
-export async function listScans(params?: PaginationParams): Promise<Scan[]> {
+export async function listScans(params?: PaginationParams): Promise<PaginatedResponse<Scan>> {
   return request(`/api/v1/scans${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 
@@ -57,13 +58,13 @@ export async function getScan(id: string): Promise<Scan> {
 export async function getScanResults(
   id: string,
   params?: PaginationParams,
-): Promise<ScanResult[]> {
+): Promise<PaginatedResponse<ScanResult>> {
   return request(`/api/v1/scans/${id}/results${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 
 // --- Results ---
 
-export async function listResults(params?: ResultFilterParams): Promise<ScanResult[]> {
+export async function listResults(params?: ResultFilterParams): Promise<PaginatedResponse<ScanResult>> {
   return request(`/api/v1/results${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 

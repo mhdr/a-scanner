@@ -96,6 +96,14 @@ export interface ApiError {
   error: string;
 }
 
+/// Paginated API response wrapper.
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
 /// A provider IP range (CIDR block).
 export interface ProviderRange {
   id: string;

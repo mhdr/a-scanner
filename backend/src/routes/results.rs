@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::ScanResult;
+use crate::models::{PaginatedResponse, ScanResult};
 use crate::services;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -29,9 +29,15 @@ pub struct ResultFilterParams {
 async fn list_results(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ResultFilterParams>,
-) -> Result<Json<Vec<ScanResult>>, AppError> {
+) -> Result<Json<PaginatedResponse<ScanResult>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
+    let total = services::result_service::count_results(
+        &state.db,
+        params.reachable_only,
+        params.provider.as_deref(),
+    )
+    .await?;
     let results = services::result_service::list_results(
         &state.db,
         page,
@@ -40,5 +46,10 @@ async fn list_results(
         params.provider.as_deref(),
     )
     .await?;
-    Ok(Json(results))
+    Ok(Json(PaginatedResponse {
+        data: results,
+        total,
+        page,
+        per_page,
+    }))
 }

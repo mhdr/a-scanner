@@ -80,3 +80,40 @@ pub async fn list_results(
 
     Ok(results)
 }
+
+/// Count all scan results matching the given filters.
+pub async fn count_results(
+    db: &SqlitePool,
+    reachable_only: Option<bool>,
+    provider: Option<&str>,
+) -> Result<i64, AppError> {
+    let reachable = reachable_only.unwrap_or(false);
+
+    let count: (i64,) = if let Some(prov) = provider {
+        if reachable {
+            sqlx::query_as(
+                "SELECT COUNT(*) FROM scan_results sr JOIN scans s ON sr.scan_id = s.id WHERE sr.is_reachable = 1 AND s.provider = ?",
+            )
+            .bind(prov)
+            .fetch_one(db)
+            .await?
+        } else {
+            sqlx::query_as(
+                "SELECT COUNT(*) FROM scan_results sr JOIN scans s ON sr.scan_id = s.id WHERE s.provider = ?",
+            )
+            .bind(prov)
+            .fetch_one(db)
+            .await?
+        }
+    } else if reachable {
+        sqlx::query_as("SELECT COUNT(*) FROM scan_results WHERE is_reachable = 1")
+            .fetch_one(db)
+            .await?
+    } else {
+        sqlx::query_as("SELECT COUNT(*) FROM scan_results")
+            .fetch_one(db)
+            .await?
+    };
+
+    Ok(count.0)
+}
