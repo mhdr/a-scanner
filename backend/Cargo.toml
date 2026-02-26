@@ -1,5 +1,5 @@
 [package]
-name = "a-scanner-backend"
+name = "a-scanner"
 version = "0.1.0"
 edition = "2021"
 

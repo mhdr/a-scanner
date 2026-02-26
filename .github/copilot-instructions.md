@@ -200,12 +200,12 @@ The project produces a **single self-contained executable**. The React frontend 
 
 ### Build script
 
-- `build.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner-backend`.
+- `build.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner`.
 
 The resulting binary can be copied to any compatible machine and run directly:
 
 ```bash
-./a-scanner-backend
+./a-scanner
 ```
 
 Environment variables:

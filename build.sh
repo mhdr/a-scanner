@@ -14,7 +14,7 @@ cd backend
 cargo build --release
 cd ..
 
-BINARY="backend/target/release/a-scanner-backend"
+BINARY="backend/target/release/a-scanner"
 
 if [ -f "$BINARY" ]; then
   echo ""
