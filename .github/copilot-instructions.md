@@ -1,8 +1,8 @@
-# Copilot Instructions — a-scanner
+# Copilot Instructions — α-scanner
 
 ## Project Overview
 
-a-scanner is a Rust-based web application for scanning Cloudflare and other CDN IP addresses to find ones that are not filtered by firewalls such as Iran's Great Firewall (GFW). It provides a web UI for initiating scans, viewing results, and managing IP ranges.
+α-scanner is a Rust-based web application for scanning Cloudflare and other CDN IP addresses to find ones that are not filtered by firewalls such as Iran's Great Firewall (GFW). It provides a web UI for initiating scans, viewing results, and managing IP ranges.
 
 ## Tech Stack
 

@@ -1,4 +1,4 @@
-# a-scanner
+# α-scanner
 
 A web-based tool for scanning Cloudflare and other CDN IP addresses to find ones that are not filtered by firewalls such as Iran's Great Firewall (GFW).
 
