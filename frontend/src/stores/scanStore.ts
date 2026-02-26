@@ -8,6 +8,9 @@ interface ScanState {
   scansPage: number;
   scansPageSize: number;
   currentScan: Scan | null;
+  currentPhase: string | null;
+  extendedDone: number;
+  extendedTotal: number;
   currentResults: ScanResult[];
   resultsTotal: number;
   resultsPage: number;
@@ -31,6 +34,9 @@ export const useScanStore = create<ScanState>((set, get) => ({
   scansPage: 0,
   scansPageSize: 10,
   currentScan: null,
+  currentPhase: null,
+  extendedDone: 0,
+  extendedTotal: 0,
   currentResults: [],
   resultsTotal: 0,
   resultsPage: 0,
@@ -64,7 +70,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
     if (!silent) set({ isScanLoading: true, error: null });
     try {
       const scan = await getScan(id);
-      set({ currentScan: scan, isScanLoading: false });
+      // Reset phase/extended progress when loading scan from API
+      // (these are only tracked via WebSocket events)
+      const phaseUpdate = silent ? {} : { currentPhase: null, extendedDone: 0, extendedTotal: 0 };
+      set({ currentScan: scan, isScanLoading: false, ...phaseUpdate });
     } catch (err) {
       if (!silent) set({ error: (err as Error).message, isScanLoading: false });
     }

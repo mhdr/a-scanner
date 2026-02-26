@@ -97,11 +97,24 @@ const extendedColumns: GridColDef[] = [
   },
 ];
 
+const PHASE_LABELS: Record<string, string> = {
+  pending: 'Waiting to start…',
+  resolving: 'Resolving IP ranges…',
+  phase1: 'Scanning IPs (Phase 1)…',
+  phase1_done: 'Phase 1 complete',
+  quick_verify: 'Quick-verifying reachable IPs…',
+  quick_verify_done: 'Quick verify complete',
+  phase2: 'Running extended tests (Phase 2)…',
+  done: 'Done',
+  failed: 'Failed',
+};
+
 export default function ScanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const {
-    currentScan, currentResults, resultsTotal, resultsPage, resultsPageSize,
+    currentScan, currentPhase, extendedDone, extendedTotal,
+    currentResults, resultsTotal, resultsPage, resultsPageSize,
     isResultsLoading, error, fetchScan, fetchScanResults, setResultsPagination,
   } = useScanStore();
 
@@ -126,10 +139,28 @@ export default function ScanDetailPage() {
   const isActive = currentScan?.status === 'pending' || currentScan?.status === 'running';
   useScanProgress(id, isActive);
 
-  const progress =
+  // Phase 1 progress: scanned_ips / total_ips
+  const phase1Progress =
     currentScan && currentScan.total_ips > 0
       ? (currentScan.scanned_ips / currentScan.total_ips) * 100
       : 0;
+
+  // Phase 2 progress: extended_done / extended_total
+  const phase2Progress =
+    extendedTotal > 0
+      ? (extendedDone / extendedTotal) * 100
+      : 0;
+
+  // Determine which progress to show
+  const isPhase2 = currentPhase === 'phase2';
+  const isQuickVerify = currentPhase === 'quick_verify';
+  const isIndeterminate =
+    (currentScan?.total_ips === 0 && currentScan?.status === 'running')
+    || currentPhase === 'resolving'
+    || isQuickVerify;
+
+  const displayProgress = isPhase2 ? phase2Progress : phase1Progress;
+  const phaseLabel = currentPhase ? (PHASE_LABELS[currentPhase] ?? currentPhase) : null;
 
   const isExtended = currentScan?.extended ?? false;
   const columns = isExtended ? extendedColumns : basicColumns;
@@ -176,12 +207,24 @@ export default function ScanDetailPage() {
               {(currentScan.status === 'pending' || currentScan.status === 'running') && (
                 <Box sx={{ mt: 1 }}>
                   <LinearProgress
-                    variant={currentScan.total_ips > 0 ? 'determinate' : 'indeterminate'}
-                    value={progress}
+                    variant={isIndeterminate ? 'indeterminate' : 'determinate'}
+                    value={displayProgress}
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    {progress.toFixed(1)}%
-                  </Typography>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="caption" color="text.secondary">
+                      {isIndeterminate
+                        ? (phaseLabel ?? 'Working…')
+                        : isPhase2
+                          ? `${extendedDone} / ${extendedTotal} extended tests (${phase2Progress.toFixed(1)}%)`
+                          : `${phase1Progress.toFixed(1)}%`
+                      }
+                    </Typography>
+                    {phaseLabel && !isIndeterminate && (
+                      <Typography variant="caption" color="text.secondary">
+                        {phaseLabel}
+                      </Typography>
+                    )}
+                  </Stack>
                 </Box>
               )}
               <Typography variant="body2" color="text.secondary">

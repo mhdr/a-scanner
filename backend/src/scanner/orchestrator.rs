@@ -51,13 +51,22 @@ pub async fn run_scan(
     if let Err(e) = run_scan_inner(&scan_id, &config, pool, tls_connector, &tx).await {
         tracing::error!("Scan {} failed: {}", scan_id, e);
         let _ = update_scan_status(pool, &scan_id, ScanStatus::Failed).await;
+        // Fetch the latest scan data from DB so we preserve the real progress counts
+        // rather than resetting them to 0.
+        let (scanned, working, total) =
+            match services::scan_service::get_scan(pool, &scan_id).await {
+                Ok(s) => (s.scanned_ips, s.working_ips, s.total_ips),
+                Err(_) => (0, 0, 0),
+            };
         let _ = tx.send(ScanProgressEvent {
             scan_id: scan_id.clone(),
             status: "failed".to_string(),
-            scanned_ips: 0,
-            working_ips: 0,
-            total_ips: 0,
+            scanned_ips: scanned,
+            working_ips: working,
+            total_ips: total,
             phase: "failed".to_string(),
+            extended_done: None,
+            extended_total: None,
         });
     }
     state.remove_scan_channel(&scan_id).await;
@@ -80,6 +89,32 @@ fn emit_progress(
         working_ips,
         total_ips,
         phase: phase.to_string(),
+        extended_done: None,
+        extended_total: None,
+    });
+}
+
+/// Emit a progress event with extended-test progress info.
+fn emit_progress_ext(
+    tx: &broadcast::Sender<ScanProgressEvent>,
+    scan_id: &str,
+    status: &str,
+    scanned_ips: i64,
+    working_ips: i64,
+    total_ips: i64,
+    phase: &str,
+    extended_done: i64,
+    extended_total: i64,
+) {
+    let _ = tx.send(ScanProgressEvent {
+        scan_id: scan_id.to_string(),
+        status: status.to_string(),
+        scanned_ips,
+        working_ips,
+        total_ips,
+        phase: phase.to_string(),
+        extended_done: Some(extended_done),
+        extended_total: Some(extended_total),
     });
 }
 
@@ -159,6 +194,7 @@ async fn run_scan_inner(
 
     // Phase 1: TCP scan — all results collected in memory, no DB writes
     let scanned_count = Arc::new(AtomicU64::new(0));
+    let working_count = Arc::new(AtomicU64::new(0));
     let reachable_results: Arc<tokio::sync::Mutex<Vec<(std::net::IpAddr, u64)>>> =
         Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
@@ -176,6 +212,7 @@ async fn run_scan_inner(
     stream::iter(ips)
         .map(|ip| {
             let scanned = scanned_count.clone();
+            let working = working_count.clone();
             let reachable = reachable_results.clone();
             let results_map = all_results.clone();
             let scan_id = scan_id_owned.clone();
@@ -188,6 +225,7 @@ async fn run_scan_inner(
                 let latency_ms = result.latency.map(|d| d.as_millis() as i64);
 
                 if result.is_reachable {
+                    working.fetch_add(1, Ordering::Relaxed);
                     if let Some(lat) = latency_ms {
                         reachable.lock().await.push((ip, lat as u64));
                     }
@@ -211,7 +249,8 @@ async fn run_scan_inner(
 
                 // Emit progress periodically to avoid flooding WS clients
                 if count % progress_interval == 0 || count == total_ips as u64 {
-                    emit_progress(&tx, &scan_id, "running", count as i64, 0, total_ips, "phase1");
+                    let w = working.load(Ordering::Relaxed) as i64;
+                    emit_progress(&tx, &scan_id, "running", count as i64, w, total_ips, "phase1");
                 }
             }
         })
@@ -257,6 +296,7 @@ async fn run_scan_inner(
             scan_id,
             pre_verify_count
         );
+        emit_progress(tx, scan_id, "running", total_ips, working_count, total_ips, "quick_verify");
 
         let connector_verify = tls_connector.clone();
         let sni_verify = sni.clone();
@@ -331,7 +371,8 @@ async fn run_scan_inner(
             return Ok(());
         }
 
-        emit_progress(tx, scan_id, "running", total_ips, verified_count, total_ips, "phase2");
+        let extended_total = reachable.len() as i64;
+        emit_progress_ext(tx, scan_id, "running", total_ips, verified_count, total_ips, "phase2", 0, extended_total);
         tracing::info!(
             "Scan {}: starting Phase 2 extended tests on {} IPs",
             scan_id,
@@ -345,12 +386,20 @@ async fn run_scan_inner(
 
         // Collect extended results in memory
         let ext_results_map = all_results.clone();
+        let ext_done_count = Arc::new(AtomicU64::new(0));
+        // Emit Phase 2 progress every N IPs (at least every 1 IP for small sets, cap at 5)
+        let ext_progress_interval = (extended_total as u64 / 20).max(1);
+        let scan_id_p2 = scan_id.to_string();
+        let tx_p2 = tx.clone();
 
         stream::iter(reachable.clone())
             .map(|(ip, tcp_ms)| {
                 let results_map = ext_results_map.clone();
                 let connector = connector.clone();
                 let sni = sni.clone();
+                let ext_done = ext_done_count.clone();
+                let scan_id = scan_id_p2.clone();
+                let tx = tx_p2.clone();
 
                 async move {
                     let result = run_extended_tests(
@@ -369,6 +418,16 @@ async fn run_scan_inner(
                         r.success_rate = Some(result.success_rate);
                         r.packet_loss = Some(result.packet_loss);
                         r.score = Some(result.score);
+                    }
+
+                    // Emit Phase 2 progress periodically
+                    let done = ext_done.fetch_add(1, Ordering::Relaxed) + 1;
+                    if done % ext_progress_interval == 0 || done == extended_total as u64 {
+                        emit_progress_ext(
+                            &tx, &scan_id, "running",
+                            total_ips, verified_count, total_ips,
+                            "phase2", done as i64, extended_total,
+                        );
                     }
                 }
             })

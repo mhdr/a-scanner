@@ -79,6 +79,8 @@ async fn scan_ws_handler(
                 working_ips: scan.working_ips,
                 total_ips: scan.total_ips,
                 phase: "done".to_string(),
+                extended_done: None,
+                extended_total: None,
             };
             if let Ok(json) = serde_json::to_string(&event) {
                 let _ = socket.send(Message::Text(json.into())).await;
@@ -100,6 +102,8 @@ async fn scan_ws_handler(
                     working_ips: scan.working_ips,
                     total_ips: scan.total_ips,
                     phase: "pending".to_string(),
+                    extended_done: None,
+                    extended_total: None,
                 };
                 if let Ok(json) = serde_json::to_string(&event) {
                     let _ = socket.send(Message::Text(json.into())).await;

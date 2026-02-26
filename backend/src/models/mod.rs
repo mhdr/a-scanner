@@ -11,6 +11,12 @@ pub struct ScanProgressEvent {
     pub total_ips: i64,
     /// Human-readable label for the current phase.
     pub phase: String,
+    /// Number of extended tests completed (Phase 2 only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extended_done: Option<i64>,
+    /// Total number of extended tests to run (Phase 2 only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extended_total: Option<i64>,
 }
 
 /// Status of a scan job.

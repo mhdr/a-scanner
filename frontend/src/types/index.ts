@@ -106,6 +106,10 @@ export interface ScanProgressEvent {
   total_ips: number;
   /** Current scan phase label. */
   phase: string;
+  /** Number of extended tests completed (Phase 2 only). */
+  extended_done?: number;
+  /** Total number of extended tests to run (Phase 2 only). */
+  extended_total?: number;
 }
 
 /// Paginated API response wrapper.
