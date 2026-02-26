@@ -3,6 +3,14 @@ name = "a-scanner"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "a_scanner_backend"
+path = "src/lib.rs"
+
+[[bin]]
+name = "a-scanner"
+path = "src/main.rs"
+
 [dependencies]
 # Web framework
 axum = { version = "0.8", features = ["macros"] }
