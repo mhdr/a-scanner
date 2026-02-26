@@ -9,12 +9,12 @@ npm install
 npm run build
 cd ..
 
-echo "=== Building backend (release) ==="
+echo "=== Building backend (release, static musl) ==="
 cd backend
-cargo build --release
+cargo build --release --target x86_64-unknown-linux-musl
 cd ..
 
-BINARY="backend/target/release/a-scanner"
+BINARY="backend/target/x86_64-unknown-linux-musl/release/a-scanner"
 
 if [ -f "$BINARY" ]; then
   echo ""
