@@ -35,8 +35,8 @@ export function useScanProgress(scanId: string | undefined, active: boolean) {
 
   const refreshData = useCallback(() => {
     if (scanId) {
-      fetchScan(scanId);
-      fetchScanResults(scanId);
+      fetchScan(scanId, true);
+      fetchScanResults(scanId, true);
     }
   }, [scanId, fetchScan, fetchScanResults]);
 

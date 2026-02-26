@@ -72,7 +72,7 @@ export default function ScansPage() {
   const navigate = useNavigate();
   const {
     scans, scansTotal, scansPage, scansPageSize,
-    isLoading, error, fetchScans, startScan, setScansPagination,
+    isScansLoading, isStarting, error, fetchScans, startScan, setScansPagination,
   } = useScanStore();
   const { providers, fetchProviders, ranges, fetchRanges } = useProviderStore();
   const {
@@ -90,11 +90,10 @@ export default function ScansPage() {
   } = useScanPreferencesStore();
 
   useEffect(() => {
-    fetchScans();
     fetchProviders();
-  }, [fetchScans, fetchProviders]);
+  }, [fetchProviders]);
 
-  // Re-fetch when pagination changes
+  // Fetch scans on mount and when pagination changes
   useEffect(() => {
     fetchScans();
   }, [scansPage, scansPageSize, fetchScans]);
@@ -174,7 +173,7 @@ export default function ScansPage() {
             variant="contained"
             startIcon={<PlayArrowIcon />}
             onClick={handleStartScan}
-            disabled={isLoading}
+            disabled={isStarting}
           >
             Start Scan
           </Button>
@@ -319,7 +318,7 @@ export default function ScansPage() {
             }}
             pageSizeOptions={[10, 25, 50, 100]}
             onRowClick={(params) => navigate(`/scans/${params.id}`)}
-            loading={isLoading}
+            loading={isScansLoading}
             autoHeight
             disableRowSelectionOnClick
             sx={{ cursor: 'pointer' }}

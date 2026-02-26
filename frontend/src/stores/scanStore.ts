@@ -12,12 +12,15 @@ interface ScanState {
   resultsTotal: number;
   resultsPage: number;
   resultsPageSize: number;
-  isLoading: boolean;
+  isScansLoading: boolean;
+  isScanLoading: boolean;
+  isResultsLoading: boolean;
+  isStarting: boolean;
   error: string | null;
   fetchScans: () => Promise<void>;
   setScansPagination: (page: number, pageSize: number) => void;
-  fetchScan: (id: string) => Promise<void>;
-  fetchScanResults: (id: string) => Promise<void>;
+  fetchScan: (id: string, silent?: boolean) => Promise<void>;
+  fetchScanResults: (id: string, silent?: boolean) => Promise<void>;
   setResultsPagination: (page: number, pageSize: number) => void;
   startScan: (req: CreateScanRequest) => Promise<void>;
 }
@@ -32,7 +35,10 @@ export const useScanStore = create<ScanState>((set, get) => ({
   resultsTotal: 0,
   resultsPage: 0,
   resultsPageSize: 25,
-  isLoading: false,
+  isScansLoading: false,
+  isScanLoading: false,
+  isResultsLoading: false,
+  isStarting: false,
   error: null,
 
   setScansPagination: (page: number, pageSize: number) => {
@@ -45,46 +51,46 @@ export const useScanStore = create<ScanState>((set, get) => ({
 
   fetchScans: async () => {
     const { scansPage, scansPageSize } = get();
-    set({ isLoading: true, error: null });
+    set({ isScansLoading: true, error: null });
     try {
       const resp = await listScans({ page: scansPage + 1, per_page: scansPageSize });
-      set({ scans: resp.data, scansTotal: resp.total, isLoading: false });
+      set({ scans: resp.data, scansTotal: resp.total, isScansLoading: false });
     } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+      set({ error: (err as Error).message, isScansLoading: false });
     }
   },
 
-  fetchScan: async (id: string) => {
-    set({ isLoading: true, error: null });
+  fetchScan: async (id: string, silent = false) => {
+    if (!silent) set({ isScanLoading: true, error: null });
     try {
       const scan = await getScan(id);
-      set({ currentScan: scan, isLoading: false });
+      set({ currentScan: scan, isScanLoading: false });
     } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+      if (!silent) set({ error: (err as Error).message, isScanLoading: false });
     }
   },
 
-  fetchScanResults: async (id: string) => {
+  fetchScanResults: async (id: string, silent = false) => {
     const { resultsPage, resultsPageSize } = get();
-    set({ isLoading: true, error: null });
+    if (!silent) set({ isResultsLoading: true, error: null });
     try {
       const resp = await getScanResults(id, { page: resultsPage + 1, per_page: resultsPageSize });
-      set({ currentResults: resp.data, resultsTotal: resp.total, isLoading: false });
+      set({ currentResults: resp.data, resultsTotal: resp.total, isResultsLoading: false });
     } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+      if (!silent) set({ error: (err as Error).message, isResultsLoading: false });
     }
   },
 
   startScan: async (req: CreateScanRequest) => {
-    set({ isLoading: true, error: null });
+    set({ isStarting: true, error: null });
     try {
       const scan = await createScan(req);
       set((state) => ({
         scans: [scan, ...state.scans],
-        isLoading: false,
+        isStarting: false,
       }));
     } catch (err) {
-      set({ error: (err as Error).message, isLoading: false });
+      set({ error: (err as Error).message, isStarting: false });
     }
   },
 }));

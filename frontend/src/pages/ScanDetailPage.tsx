@@ -102,7 +102,7 @@ export default function ScanDetailPage() {
   const navigate = useNavigate();
   const {
     currentScan, currentResults, resultsTotal, resultsPage, resultsPageSize,
-    isLoading, error, fetchScan, fetchScanResults, setResultsPagination,
+    isResultsLoading, error, fetchScan, fetchScanResults, setResultsPagination,
   } = useScanStore();
 
   const refreshData = useCallback(() => {
@@ -208,7 +208,7 @@ export default function ScanDetailPage() {
             }}
             pageSizeOptions={[10, 25, 50, 100]}
             sortingMode="server"
-            loading={isLoading}
+            loading={isResultsLoading}
             autoHeight
             disableRowSelectionOnClick
           />

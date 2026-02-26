@@ -33,8 +33,10 @@ export const useResultStore = create<ResultState>((set, get) => ({
   },
 
   fetchResults: async () => {
-    const { page, pageSize, reachableOnly } = get();
-    set({ isLoading: true, error: null });
+    const { page, pageSize, reachableOnly, results } = get();
+    // Only show loading indicator when there's no existing data (initial load)
+    if (results.length === 0) set({ isLoading: true });
+    set({ error: null });
     try {
       const resp = await listResults({
         reachable_only: reachableOnly,
