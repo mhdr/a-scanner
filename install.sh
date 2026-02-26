@@ -392,10 +392,11 @@ WantedBy=multi-user.target
 UNIT
     ok "Service file written to ${SERVICE_FILE}"
 
-    # --- enable & start ---
+    # --- enable & (re)start ---
     step "Starting service"
     systemctl daemon-reload
-    systemctl enable --now "${APP_NAME}.service"
+    systemctl enable "${APP_NAME}.service"
+    systemctl restart "${APP_NAME}.service"
     ok "${APP_NAME} is now enabled and running."
 
     # --- final success message ---
