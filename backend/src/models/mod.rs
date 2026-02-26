@@ -40,6 +40,7 @@ pub struct Scan {
     pub status: String,
     pub total_ips: i64,
     pub scanned_ips: i64,
+    pub working_ips: i64,
     pub created_at: String,
     pub updated_at: String,
     pub mode: String,

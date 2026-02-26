@@ -18,7 +18,7 @@ pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec
     let limit = per_page as i64;
 
     let scans = sqlx::query_as::<_, Scan>(
-        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+        "SELECT id, provider, status, total_ips, scanned_ips, working_ips, created_at, updated_at,
                 mode, concurrency, timeout_ms, port, extended
          FROM scans
          ORDER BY created_at DESC
@@ -43,9 +43,9 @@ pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Sca
     let mode = if req.extended { "extended" } else { "basic" };
 
     sqlx::query(
-        "INSERT INTO scans (id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+        "INSERT INTO scans (id, provider, status, total_ips, scanned_ips, working_ips, created_at, updated_at,
                             mode, concurrency, timeout_ms, port, extended)
-         VALUES (?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&id)
     .bind(&req.provider)
@@ -66,7 +66,7 @@ pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Sca
 /// Get a single scan by ID.
 pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
     let scan = sqlx::query_as::<_, Scan>(
-        "SELECT id, provider, status, total_ips, scanned_ips, created_at, updated_at,
+        "SELECT id, provider, status, total_ips, scanned_ips, working_ips, created_at, updated_at,
                 mode, concurrency, timeout_ms, port, extended
          FROM scans WHERE id = ?",
     )
@@ -76,6 +76,17 @@ pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
     .ok_or_else(|| AppError::NotFound(format!("Scan {id} not found")))?;
 
     Ok(scan)
+}
+
+/// Update the working_ips count for a scan.
+pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE scans SET working_ips = ?, updated_at = ? WHERE id = ?")
+        .bind(count)
+        .bind(chrono::Utc::now().to_rfc3339())
+        .bind(scan_id)
+        .execute(db)
+        .await?;
+    Ok(())
 }
 
 /// Count results for a specific scan.

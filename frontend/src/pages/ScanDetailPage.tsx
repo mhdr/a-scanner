@@ -182,6 +182,7 @@ export default function ScanDetailPage() {
               </Stack>
               <Typography variant="body2" color="text.secondary">
                 {currentScan.scanned_ips} / {currentScan.total_ips} IPs scanned
+                {currentScan.working_ips > 0 && ` | ${currentScan.working_ips} working`}
                 {' | '}Concurrency: {currentScan.concurrency}
                 {' | '}Timeout: {currentScan.timeout_ms}ms
               </Typography>

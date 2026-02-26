@@ -8,6 +8,7 @@ export interface Scan {
   status: ScanStatus;
   total_ips: number;
   scanned_ips: number;
+  working_ips: number;
   created_at: string;
   updated_at: string;
   mode: string;

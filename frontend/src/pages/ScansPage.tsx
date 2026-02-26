@@ -64,6 +64,7 @@ const columns: GridColDef[] = [
   },
   { field: 'total_ips', headerName: 'Total IPs', width: 110, type: 'number' },
   { field: 'scanned_ips', headerName: 'Scanned', width: 110, type: 'number' },
+  { field: 'working_ips', headerName: 'Working', width: 110, type: 'number' },
   { field: 'created_at', headerName: 'Created', width: 200 },
 ];
 

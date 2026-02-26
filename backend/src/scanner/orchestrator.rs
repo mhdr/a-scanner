@@ -196,6 +196,12 @@ async fn run_scan_inner(
         total_ips
     );
 
+    // Persist working_ips count after Phase 1
+    let working_count = reachable.len() as i64;
+    if let Err(e) = services::scan_service::update_working_ips(pool, scan_id, working_count).await {
+        tracing::warn!("Scan {}: failed to update working_ips: {}", scan_id, e);
+    }
+
     // Phase 2: Extended tests (if enabled)
     if config.extended && !reachable.is_empty() {
         // Phase 1.5: Quick verify — filter out IPs that are TCP-reachable but
@@ -264,6 +270,12 @@ async fn run_scan_inner(
             reachable.len(),
             pre_verify_count
         );
+
+        // Update working_ips with refined count after quick verify
+        let verified_count = reachable.len() as i64;
+        if let Err(e) = services::scan_service::update_working_ips(pool, scan_id, verified_count).await {
+            tracing::warn!("Scan {}: failed to update working_ips after quick verify: {}", scan_id, e);
+        }
 
         if reachable.is_empty() {
             tracing::info!("Scan {}: no IPs passed quick verify, skipping Phase 2", scan_id);
