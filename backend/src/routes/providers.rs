@@ -10,14 +10,15 @@ use axum::{
 use crate::AppState;
 use crate::error::AppError;
 use crate::models::{
-    BulkToggleRequest, CreateRangeRequest, Provider, ProviderRange, ProviderSettings,
-    UpdateProviderSettingsRequest, UpdateRangeRequest,
+    BulkToggleRequest, CreateProviderRequest, CreateRangeRequest, Provider, ProviderRange,
+    ProviderSettings, UpdateProviderRequest, UpdateProviderSettingsRequest, UpdateRangeRequest,
 };
 use crate::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/", get(list_providers))
+        .route("/", get(list_providers).post(create_provider))
+        .route("/{id}", get(get_provider).put(update_provider).delete(delete_provider))
         .route("/{id}/ranges", get(list_ranges).post(create_range))
         .route("/{id}/ranges/fetch", post(fetch_ranges))
         .route("/{id}/ranges/bulk", patch(bulk_toggle))
@@ -25,23 +26,49 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/{id}/settings", get(get_settings).put(update_settings))
 }
 
-/// GET /api/v1/providers — list supported CDN providers.
+/// GET /api/v1/providers — list all providers from the database.
 async fn list_providers(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Provider>>, AppError> {
-    let providers = vec![
-        Provider {
-            id: "cloudflare".to_string(),
-            name: "Cloudflare".to_string(),
-            description: "Cloudflare CDN IP ranges".to_string(),
-        },
-        Provider {
-            id: "gcore".to_string(),
-            name: "Gcore".to_string(),
-            description: "Gcore CDN IP ranges".to_string(),
-        },
-    ];
+    let providers = services::provider_service::list_providers(&state.db).await?;
     Ok(Json(providers))
+}
+
+/// GET /api/v1/providers/:id — get a single provider.
+async fn get_provider(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<Provider>, AppError> {
+    let provider = services::provider_service::get_provider_by_id(&state.db, &id).await?;
+    Ok(Json(provider))
+}
+
+/// POST /api/v1/providers — create a new custom provider.
+async fn create_provider(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<CreateProviderRequest>,
+) -> Result<(StatusCode, Json<Provider>), AppError> {
+    let provider = services::provider_service::create_provider(&state.db, &body).await?;
+    Ok((StatusCode::CREATED, Json(provider)))
+}
+
+/// PUT /api/v1/providers/:id — update a provider.
+async fn update_provider(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateProviderRequest>,
+) -> Result<Json<Provider>, AppError> {
+    let provider = services::provider_service::update_provider(&state.db, &id, &body).await?;
+    Ok(Json(provider))
+}
+
+/// DELETE /api/v1/providers/:id — delete a custom provider.
+async fn delete_provider(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, AppError> {
+    services::provider_service::delete_provider(&state.db, &id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// GET /api/v1/providers/:id/ranges — list all IP ranges for a provider.

@@ -4,10 +4,132 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::models::{
-    BulkToggleRequest, CreateRangeRequest, ProviderRange, ProviderSettings,
-    UpdateProviderSettingsRequest, UpdateRangeRequest,
+    BulkToggleRequest, CreateProviderRequest, CreateRangeRequest, Provider, ProviderRange,
+    ProviderSettings, UpdateProviderRequest, UpdateProviderSettingsRequest, UpdateRangeRequest,
 };
-use crate::scanner::provider::{fetch_cidr_list, get_provider};
+use crate::scanner::provider::{fetch_cidr_list, get_provider_from_db};
+
+// ---------------------------------------------------------------------------
+// Provider CRUD
+// ---------------------------------------------------------------------------
+
+/// List all providers.
+pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, AppError> {
+    let providers = sqlx::query_as::<_, Provider>(
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+         FROM providers ORDER BY name",
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(providers)
+}
+
+/// Get a single provider by ID.
+pub async fn get_provider_by_id(db: &SqlitePool, id: &str) -> Result<Provider, AppError> {
+    sqlx::query_as::<_, Provider>(
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+         FROM providers WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Provider '{id}' not found")))
+}
+
+/// Create a new custom provider.
+pub async fn create_provider(
+    db: &SqlitePool,
+    req: &CreateProviderRequest,
+) -> Result<Provider, AppError> {
+    let id = Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let description = req.description.clone().unwrap_or_default();
+    let urls_json = serde_json::to_string(&req.ip_range_urls)
+        .map_err(|e| AppError::BadRequest(format!("Invalid ip_range_urls: {e}")))?;
+
+    sqlx::query(
+        "INSERT INTO providers (id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+    )
+    .bind(&id)
+    .bind(&req.name)
+    .bind(&description)
+    .bind(&req.sni)
+    .bind(&urls_json)
+    .bind(&now)
+    .bind(&now)
+    .execute(db)
+    .await?;
+
+    // Also create a provider_settings row.
+    sqlx::query(
+        "INSERT OR IGNORE INTO provider_settings (provider_id, auto_update, auto_update_interval_hours)
+         VALUES (?, 0, 24)",
+    )
+    .bind(&id)
+    .execute(db)
+    .await?;
+
+    get_provider_by_id(db, &id).await
+}
+
+/// Update an existing provider.
+pub async fn update_provider(
+    db: &SqlitePool,
+    id: &str,
+    req: &UpdateProviderRequest,
+) -> Result<Provider, AppError> {
+    let existing = get_provider_by_id(db, id).await?;
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let name = req.name.as_deref().unwrap_or(&existing.name);
+    let description = req.description.as_deref().unwrap_or(&existing.description);
+    let sni = req.sni.as_deref().unwrap_or(&existing.sni);
+    let urls_json = if let Some(ref urls) = req.ip_range_urls {
+        serde_json::to_string(urls)
+            .map_err(|e| AppError::BadRequest(format!("Invalid ip_range_urls: {e}")))?            
+    } else {
+        existing.ip_range_urls.clone()
+    };
+
+    sqlx::query(
+        "UPDATE providers SET name = ?, description = ?, sni = ?, ip_range_urls = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(name)
+    .bind(description)
+    .bind(sni)
+    .bind(&urls_json)
+    .bind(&now)
+    .bind(id)
+    .execute(db)
+    .await?;
+
+    get_provider_by_id(db, id).await
+}
+
+/// Delete a provider and all associated ranges & settings.
+pub async fn delete_provider(db: &SqlitePool, id: &str) -> Result<(), AppError> {
+    let existing = get_provider_by_id(db, id).await?;
+    if existing.is_builtin {
+        return Err(AppError::BadRequest(
+            "Cannot delete a built-in provider".to_string(),
+        ));
+    }
+    // Cascade delete ranges and settings.
+    sqlx::query("DELETE FROM provider_ranges WHERE provider_id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    sqlx::query("DELETE FROM provider_settings WHERE provider_id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    sqlx::query("DELETE FROM providers WHERE id = ?")
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(())
+}
 
 // ---------------------------------------------------------------------------
 // Range queries
@@ -70,8 +192,7 @@ pub async fn fetch_and_store_ranges(
     db: &SqlitePool,
     provider_id: &str,
 ) -> Result<Vec<ProviderRange>, AppError> {
-    let provider = get_provider(provider_id)
-        .ok_or_else(|| AppError::BadRequest(format!("Unknown provider: {provider_id}")))?;
+    let provider = get_provider_from_db(db, provider_id).await?;
 
     let mut all_cidrs: Vec<(String, i64)> = Vec::new();
     for url in provider.ip_range_urls() {
@@ -146,8 +267,7 @@ pub async fn create_custom_range(
     req: &CreateRangeRequest,
 ) -> Result<ProviderRange, AppError> {
     // Validate provider exists.
-    let _ = get_provider(provider_id)
-        .ok_or_else(|| AppError::BadRequest(format!("Unknown provider: {provider_id}")))?;
+    let _ = get_provider_by_id(db, provider_id).await?;
 
     // Validate CIDR format.
     let net: IpNet = req

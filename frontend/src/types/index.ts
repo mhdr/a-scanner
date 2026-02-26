@@ -38,6 +38,27 @@ export interface Provider {
   id: string;
   name: string;
   description: string;
+  sni: string;
+  ip_range_urls: string;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/// Request body for creating a new provider.
+export interface CreateProviderRequest {
+  name: string;
+  description?: string;
+  sni: string;
+  ip_range_urls: string[];
+}
+
+/// Request body for updating a provider.
+export interface UpdateProviderRequest {
+  name?: string;
+  description?: string;
+  sni?: string;
+  ip_range_urls?: string[];
 }
 
 /// Pagination query parameters.

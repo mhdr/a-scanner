@@ -66,12 +66,36 @@ pub struct ScanResult {
     pub score: Option<f64>,
 }
 
-/// Supported CDN provider.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Supported CDN provider stored in the database.
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Provider {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub sni: String,
+    /// JSON array of upstream URL strings, e.g. `["https://..."]`.
+    pub ip_range_urls: String,
+    pub is_builtin: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Request body for creating a new provider.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateProviderRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub sni: String,
+    pub ip_range_urls: Vec<String>,
+}
+
+/// Request body for updating a provider.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateProviderRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub sni: Option<String>,
+    pub ip_range_urls: Option<Vec<String>>,
 }
 
 /// A provider IP range (CIDR block) stored in the database.

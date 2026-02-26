@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use ipnet::IpNet;
 
-use super::provider::{expand_ranges, fetch_provider_ips, get_provider};
+use super::provider::{expand_ranges, fetch_provider_ips, get_provider_from_db};
 use super::{probe_ip, run_extended_tests, setup_fd_limit, ScanConfig};
 use crate::models::ScanStatus;
 use crate::services;
@@ -39,8 +39,9 @@ async fn run_scan_inner(
     tls_connector: &Arc<TlsConnector>,
 ) -> anyhow::Result<()> {
     // Resolve provider
-    let provider = get_provider(&config.provider_id)
-        .ok_or_else(|| anyhow::anyhow!("Unknown provider: {}", config.provider_id))?;
+    let provider = get_provider_from_db(pool, &config.provider_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("Provider lookup failed: {e}"))?;
 
     // Update status to running
     update_scan_status(pool, scan_id, ScanStatus::Running).await?;

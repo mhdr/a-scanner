@@ -1,10 +1,18 @@
 import type {
+  CreateProviderRequest,
+  CreateRangeRequest,
   CreateScanRequest,
+  BulkToggleRequest,
   PaginationParams,
   Provider,
+  ProviderRange,
+  ProviderSettings,
   ResultFilterParams,
   Scan,
   ScanResult,
+  UpdateProviderRequest,
+  UpdateProviderSettingsRequest,
+  UpdateRangeRequest,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -63,6 +71,30 @@ export async function listResults(params?: ResultFilterParams): Promise<ScanResu
 
 export async function listProviders(): Promise<Provider[]> {
   return request('/api/v1/providers');
+}
+
+export async function getProvider(id: string): Promise<Provider> {
+  return request(`/api/v1/providers/${id}`);
+}
+
+export async function createProvider(body: CreateProviderRequest): Promise<Provider> {
+  return request('/api/v1/providers', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateProvider(
+  id: string, body: UpdateProviderRequest,
+): Promise<Provider> {
+  return request(`/api/v1/providers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteProvider(id: string): Promise<void> {
+  await request(`/api/v1/providers/${id}`, { method: 'DELETE' });
 }
 
 // ---------------------------------------------------------------------------

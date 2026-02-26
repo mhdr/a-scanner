@@ -4,13 +4,18 @@ import {
   listProviders, getProviderRanges, fetchProviderRanges, createProviderRange,
   updateProviderRange, deleteProviderRange, bulkToggleRanges,
   getProviderSettings, updateProviderSettings,
+  createProvider as apiCreateProvider,
+  updateProvider as apiUpdateProvider,
+  deleteProvider as apiDeleteProvider,
 } from '../api';
 import type {
+  CreateProviderRequest, UpdateProviderRequest,
   CreateRangeRequest, UpdateRangeRequest, BulkToggleRequest, UpdateProviderSettingsRequest,
 } from '../types';
 
 interface ProviderState {
   providers: Provider[];
+  selectedProviderId: string | null;
   isLoading: boolean;
   error: string | null;
 
@@ -22,7 +27,12 @@ interface ProviderState {
   settings: Record<string, ProviderSettings>;
   settingsLoading: boolean;
 
+  // Provider actions
   fetchProviders: () => Promise<void>;
+  selectProvider: (id: string | null) => void;
+  createProvider: (req: CreateProviderRequest) => Promise<void>;
+  updateProvider: (id: string, req: UpdateProviderRequest) => Promise<void>;
+  deleteProvider: (id: string) => Promise<void>;
 
   // Range actions
   fetchRanges: (providerId: string) => Promise<void>;
@@ -39,6 +49,7 @@ interface ProviderState {
 
 export const useProviderStore = create<ProviderState>((set, get) => ({
   providers: [],
+  selectedProviderId: null,
   isLoading: false,
   error: null,
   ranges: {},
@@ -50,9 +61,54 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const providers = await listProviders();
-      set({ providers, isLoading: false });
+      const current = get().selectedProviderId;
+      const selected = providers.find((p) => p.id === current)
+        ? current
+        : providers.length > 0
+          ? providers[0].id
+          : null;
+      set({ providers, selectedProviderId: selected, isLoading: false });
     } catch (err) {
       set({ error: (err as Error).message, isLoading: false });
+    }
+  },
+
+  selectProvider: (id: string | null) => {
+    set({ selectedProviderId: id });
+  },
+
+  createProvider: async (req: CreateProviderRequest) => {
+    set({ error: null });
+    try {
+      const provider = await apiCreateProvider(req);
+      await get().fetchProviders();
+      set({ selectedProviderId: provider.id });
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  updateProvider: async (id: string, req: UpdateProviderRequest) => {
+    set({ error: null });
+    try {
+      await apiUpdateProvider(id, req);
+      await get().fetchProviders();
+    } catch (err) {
+      set({ error: (err as Error).message });
+    }
+  },
+
+  deleteProvider: async (id: string) => {
+    set({ error: null });
+    try {
+      await apiDeleteProvider(id);
+      const { selectedProviderId } = get();
+      if (selectedProviderId === id) {
+        set({ selectedProviderId: null });
+      }
+      await get().fetchProviders();
+    } catch (err) {
+      set({ error: (err as Error).message });
     }
   },
 

@@ -1,8 +1,10 @@
 use std::net::IpAddr;
 
 use ipnet::IpNet;
+use sqlx::SqlitePool;
 
 use super::CdnProvider;
+use crate::error::AppError;
 
 /// Fetch a URL and parse each non-empty, non-comment line as an IpNet CIDR range.
 pub(crate) async fn fetch_cidr_list(url: &str) -> anyhow::Result<Vec<IpNet>> {
@@ -54,55 +56,55 @@ pub fn expand_ranges(ranges: &[IpNet], ipv4_only: bool) -> Vec<IpAddr> {
     ips
 }
 
-/// Cloudflare CDN provider — fetches live CIDR ranges from Cloudflare's public endpoint.
-pub struct CloudflareProvider;
+/// Database-backed CDN provider, constructed from the `providers` table.
+pub struct DbProvider {
+    pub id_val: String,
+    pub name_val: String,
+    pub sni_val: String,
+    pub urls: Vec<String>,
+}
 
-impl CdnProvider for CloudflareProvider {
+impl CdnProvider for DbProvider {
     fn name(&self) -> &str {
-        "Cloudflare"
+        &self.name_val
     }
 
     fn id(&self) -> &str {
-        "cloudflare"
+        &self.id_val
     }
 
     fn sni(&self) -> &str {
-        "cloudflare.com"
+        &self.sni_val
     }
 
     fn ip_range_urls(&self) -> Vec<&str> {
-        vec!["https://www.cloudflare.com/ips-v4"]
+        self.urls.iter().map(|s| s.as_str()).collect()
     }
 }
 
-/// Gcore CDN provider.
-pub struct GcoreProvider;
+/// Load a provider from the database and return it as a `Box<dyn CdnProvider>`.
+pub async fn get_provider_from_db(
+    db: &SqlitePool,
+    id: &str,
+) -> Result<Box<dyn CdnProvider>, AppError> {
+    let row = sqlx::query_as::<_, crate::models::Provider>(
+        "SELECT id, name, description, sni, ip_range_urls, is_builtin, created_at, updated_at
+         FROM providers WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Provider '{id}' not found")))?;
 
-impl CdnProvider for GcoreProvider {
-    fn name(&self) -> &str {
-        "Gcore"
-    }
+    let urls: Vec<String> = serde_json::from_str(&row.ip_range_urls)
+        .unwrap_or_default();
 
-    fn id(&self) -> &str {
-        "gcore"
-    }
-
-    fn sni(&self) -> &str {
-        "gcore.com"
-    }
-
-    fn ip_range_urls(&self) -> Vec<&str> {
-        vec!["https://api.gcore.com/cdn/public-net-list"]
-    }
-}
-
-/// Get a provider implementation by ID string.
-pub fn get_provider(id: &str) -> Option<Box<dyn CdnProvider>> {
-    match id {
-        "cloudflare" => Some(Box::new(CloudflareProvider)),
-        "gcore" => Some(Box::new(GcoreProvider)),
-        _ => None,
-    }
+    Ok(Box::new(DbProvider {
+        id_val: row.id,
+        name_val: row.name,
+        sni_val: row.sni,
+        urls,
+    }))
 }
 
 /// Fetch and expand all IP ranges for a provider.
