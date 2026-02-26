@@ -418,8 +418,11 @@ UNIT
     fi
 
     printf "  ${_W}Web UI${_RESET}     ${_C}%s${_RESET}\n" "$access_url"
+    printf "  ${_W}Login${_RESET}      username: ${_C}admin${_RESET}  password: ${_C}admin${_RESET}\n"
     printf "  ${_W}Database${_RESET}   %s/scanner.db\n" "$INSTALL_DIR"
     printf "  ${_W}Logs${_RESET}       journalctl -u ${APP_NAME} -f\n"
+    echo ""
+    warn "Change the default password after your first login!"
     echo ""
 
     header "  Useful commands:"
