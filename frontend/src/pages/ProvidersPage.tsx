@@ -111,7 +111,7 @@ function ProviderSection({ provider }: ProviderSectionProps) {
 
   const providerRanges = ranges[provider.id] ?? [];
   const providerSettings = settings[provider.id];
-  const [selection, setSelection] = useState<GridRowSelectionModel>([]);
+  const [selection, setSelection] = useState<GridRowSelectionModel>({ type: 'include', ids: new Set() });
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -159,16 +159,16 @@ function ProviderSection({ provider }: ProviderSectionProps) {
   };
 
   const handleBulkEnable = async () => {
-    if (selection.length > 0) {
-      await bulkToggle(provider.id, { range_ids: selection as string[], enabled: true });
-      setSelection([]);
+    if (selection.ids.size > 0) {
+      await bulkToggle(provider.id, { range_ids: Array.from(selection.ids) as string[], enabled: true });
+      setSelection({ type: 'include', ids: new Set() });
     }
   };
 
   const handleBulkDisable = async () => {
-    if (selection.length > 0) {
-      await bulkToggle(provider.id, { range_ids: selection as string[], enabled: false });
-      setSelection([]);
+    if (selection.ids.size > 0) {
+      await bulkToggle(provider.id, { range_ids: Array.from(selection.ids) as string[], enabled: false });
+      setSelection({ type: 'include', ids: new Set() });
     }
   };
 
@@ -287,13 +287,13 @@ function ProviderSection({ provider }: ProviderSectionProps) {
           <Button size="small" onClick={handleDeselectAll} disabled={totalRanges === 0}>
             Disable All
           </Button>
-          {selection.length > 0 && (
+          {selection.ids.size > 0 && (
             <>
               <Button size="small" variant="outlined" color="success" onClick={handleBulkEnable}>
-                Enable Selected ({selection.length})
+                Enable Selected ({selection.ids.size})
               </Button>
               <Button size="small" variant="outlined" color="warning" onClick={handleBulkDisable}>
-                Disable Selected ({selection.length})
+                Disable Selected ({selection.ids.size})
               </Button>
             </>
           )}
