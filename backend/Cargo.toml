@@ -16,7 +16,7 @@ path = "src/main.rs"
 axum = { version = "0.8", features = ["macros"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-br", "compression-gzip"] }
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "migrate"] }
@@ -49,6 +49,13 @@ tokio-rustls = "0.26"
 webpki-roots = "0.26"
 futures = "0.3"
 rlimit = "0.10"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "z"
+panic = "abort"
 
 [dev-dependencies]
 axum-test = "16"

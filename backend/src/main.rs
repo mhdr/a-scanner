@@ -1,4 +1,5 @@
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -45,6 +46,7 @@ async fn main() -> anyhow::Result<()> {
     // Build the application router
     let app = Router::new()
         .merge(routes::app_router())
+        .layer(CompressionLayer::new())
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
