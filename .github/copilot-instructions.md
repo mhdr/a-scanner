@@ -21,7 +21,7 @@ a-scanner/
 │   └── copilot-instructions.md
 ├── run-backend.sh               # Dev script: start backend
 ├── run-frontend.sh              # Dev script: start frontend
-├── deploy.sh                    # Build single deployable executable
+├── build.sh                     # Build single deployable executable
 ├── backend/
 │   ├── Cargo.toml
 │   ├── src/
@@ -198,9 +198,9 @@ The project produces a **single self-contained executable**. The React frontend 
 2. The backend compiles with `cargo build --release`. The `rust-embed` crate embeds all files from `frontend/dist/` into the binary.
 3. At runtime, the server serves API routes under `/api/v1/` and falls back to the embedded frontend assets for all other paths (SPA routing via `index.html` fallback).
 
-### Deploy script
+### Build script
 
-- `deploy.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner-backend`.
+- `build.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner-backend`.
 
 The resulting binary can be copied to any compatible machine and run directly:
 
