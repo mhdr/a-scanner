@@ -467,15 +467,17 @@ do_uninstall() {
 # ---------- action chooser ----------
 
 choose_action() {
-    show_banner
-    step "What would you like to do?"
-    echo ""
-    printf "  ${_C}1${_RESET})  ${_W}Install / Update${_RESET}   — install ${APP_NAME} or upgrade to a new version\n"
-    printf "  ${_C}2${_RESET})  ${_W}Uninstall${_RESET}          — stop and remove ${APP_NAME}\n"
-    echo ""
-    printf "  ${_W}›${_RESET} Choose an option ${_D}[1]${_RESET}: "
+    # All display output must go to /dev/tty because this function is
+    # called inside $(...) command substitution which captures stdout.
+    show_banner > /dev/tty
+    step "What would you like to do?" > /dev/tty
+    echo "" > /dev/tty
+    printf "  ${_C}1${_RESET})  ${_W}Install / Update${_RESET}   — install ${APP_NAME} or upgrade to a new version\n" > /dev/tty
+    printf "  ${_C}2${_RESET})  ${_W}Uninstall${_RESET}          — stop and remove ${APP_NAME}\n" > /dev/tty
+    echo "" > /dev/tty
+    printf "  ${_W}›${_RESET} Choose an option ${_D}[1]${_RESET}: " > /dev/tty
     local choice
-    read -r choice
+    read -r choice < /dev/tty
     choice="${choice:-1}"
     case "$choice" in
         1) echo "install" ;;
