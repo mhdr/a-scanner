@@ -57,10 +57,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         // Root check failed — not rooted
       }
 
-      // Raise FD limits if rooted
+      // Raise FD limits if rooted (uses prlimit via su on the app's own PID)
       if (hasRoot) {
         try {
-          await bridge.raiseFdLimit();
+          const fdResult = await bridge.raiseFdLimit();
+          console.log(
+            `FD limits raised: soft=${fdResult.soft}, hard=${fdResult.hard} (method: ${fdResult.method})`,
+          );
         } catch {
           // Best-effort
         }

@@ -36,6 +36,7 @@ dependencies = [
  "a-scanner-core",
  "jni",
  "once_cell",
+ "rlimit",
  "serde",
  "serde_json",
  "tokio",

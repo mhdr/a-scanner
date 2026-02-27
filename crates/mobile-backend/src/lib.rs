@@ -187,7 +187,20 @@ pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_init(
             .with_target(true)
             .try_init();
 
-        tracing::info!("mobile-backend initialised");
+        // Log current FD limits for diagnostics.
+        match rlimit::getrlimit(rlimit::Resource::NOFILE) {
+            Ok((soft, hard)) => {
+                tracing::info!(
+                    "mobile-backend initialised (FD limits: soft={soft}, hard={hard})"
+                );
+            }
+            Err(e) => {
+                tracing::info!(
+                    "mobile-backend initialised (could not read FD limits: {e})"
+                );
+            }
+        }
+
         Ok(ok_void(env))
     })
 }
@@ -219,24 +232,76 @@ pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_checkRootAccess(
 
 /// Raise file-descriptor limits via root (best-effort).
 ///
-/// Runs `su -c "ulimit -n 65536"`. Returns a JSON result string.
+/// Uses `prlimit` via `su` to set the NOFILE (open files) soft and hard limits
+/// on the **current process** (identified by PID). This is necessary because
+/// running `ulimit -n` in a child `su` shell only affects that shell — it does
+/// NOT change the calling process's limits.
+///
+/// Falls back to a direct `rlimit::setrlimit` attempt if `prlimit` is
+/// unavailable or fails.
+///
+/// Returns a JSON result:
+/// ```json
+/// {"ok": true, "soft": 65536, "hard": 65536, "method": "prlimit"}
+/// ```
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_raiseFdLimit(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     safe_jni_call(&mut env, |env| {
-        let output = Command::new("su")
-            .args(["-c", "ulimit -n 65536"])
-            .output()
-            .map_err(|e| format!("Failed to run su: {e}"))?;
+        let desired: u64 = 65536;
+        let pid = std::process::id();
 
-        if output.status.success() {
-            Ok(ok_void(env))
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("ulimit failed: {stderr}"))
+        // Attempt 1: use `prlimit` via root to set limits on our own process.
+        let prlimit_cmd = format!("prlimit --pid {pid} --nofile={desired}:{desired}");
+        let prlimit_result = Command::new("su")
+            .args(["-c", &prlimit_cmd])
+            .output();
+
+        let method;
+        match prlimit_result {
+            Ok(output) if output.status.success() => {
+                tracing::info!(
+                    "Raised FD limit to {desired} via prlimit (pid {pid})"
+                );
+                method = "prlimit";
+            }
+            _ => {
+                // Attempt 2: fall back to rlimit crate (calls setrlimit directly
+                // — may be capped by the current hard limit without root prlimit).
+                tracing::warn!(
+                    "prlimit via su failed for pid {pid}, falling back to rlimit crate"
+                );
+                match rlimit::setrlimit(rlimit::Resource::NOFILE, desired, desired) {
+                    Ok(()) => {
+                        tracing::info!(
+                            "Raised FD limit to {desired} via rlimit::setrlimit"
+                        );
+                        method = "rlimit";
+                    }
+                    Err(e) => {
+                        tracing::warn!("rlimit::setrlimit also failed: {e}");
+                        // Last resort: increase within current hard limit.
+                        let _ = rlimit::increase_nofile_limit(desired);
+                        method = "increase_nofile_limit";
+                    }
+                }
+            }
         }
+
+        // Read back actual limits for the response.
+        let (soft, hard) =
+            rlimit::getrlimit(rlimit::Resource::NOFILE).unwrap_or((0, 0));
+
+        tracing::info!("FD limits after raise: soft={soft}, hard={hard}");
+
+        Ok(to_jstring(
+            env,
+            &format!(
+                r#"{{"ok":true,"soft":{soft},"hard":{hard},"method":"{method}"}}"#
+            ),
+        ))
     })
 }
 

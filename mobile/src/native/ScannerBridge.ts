@@ -62,10 +62,18 @@ export async function checkRootAccess(): Promise<boolean> {
   return ScannerModule.checkRootAccess();
 }
 
-/** Raise file-descriptor limits via root (best-effort). */
-export async function raiseFdLimit(): Promise<void> {
+/** Result from raising file descriptor limits. */
+export interface RaiseFdLimitResult {
+  ok: boolean;
+  soft: number;
+  hard: number;
+  method: string;
+}
+
+/** Raise file-descriptor limits via root (best-effort). Returns limit details. */
+export async function raiseFdLimit(): Promise<RaiseFdLimitResult> {
   const json: string = await ScannerModule.raiseFdLimit();
-  parseResponse<{ ok: boolean }>(json);
+  return parseResponse<RaiseFdLimitResult>(json);
 }
 
 // ---------------------------------------------------------------------------
