@@ -7,9 +7,16 @@ edition.workspace = true
 name = "a_scanner_core"
 path = "src/lib.rs"
 
+[features]
+default = []
+## Enable bundled SQLite for platforms without a system SQLite (e.g. Android).
+bundled-sqlite = ["dep:libsqlite3-sys"]
+
 [dependencies]
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "migrate"] }
+# Bundled SQLite (only pulled in when the `bundled-sqlite` feature is active)
+libsqlite3-sys = { version = "0.30", features = ["bundled"], optional = true }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

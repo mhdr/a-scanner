@@ -1,0 +1,17 @@
+# Cross-compilation configuration for Android targets.
+#
+# Prerequisites:
+#   1. Install Android NDK (r26+ recommended)
+#   2. Set ANDROID_NDK_HOME to the NDK root, e.g.:
+#        export ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/26.1.10909125
+#   3. Install the Rust target:
+#        rustup target add aarch64-linux-android
+#
+# The linker path below assumes NDK r23+ unified toolchain layout.
+# Adjust the API level suffix (android31) if targeting a different minimum SDK.
+
+[target.aarch64-linux-android]
+linker = "aarch64-linux-android31-clang"
+
+# If the NDK toolchain bin directory is NOT on your $PATH, use the full path:
+# linker = "/path/to/ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang"
