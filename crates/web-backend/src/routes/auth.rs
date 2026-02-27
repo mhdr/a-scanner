@@ -10,8 +10,8 @@ use axum::{
 
 use crate::AppState;
 use crate::error::AppError;
-use a_scanner_core::models::{AuthMeResponse, ChangePasswordRequest, Claims, LoginRequest, LoginResponse};
-use a_scanner_core::services::auth_service;
+use a_scanner_core::facade;
+use a_scanner_core::models::{AuthMeResponse, ChangePasswordRequest, Claims, LoginRequest};
 
 /// Build the auth router (mounted at /api/v1/auth).
 pub fn router() -> Router<Arc<AppState>> {
@@ -26,31 +26,8 @@ async fn login_handler(
     State(state): State<Arc<AppState>>,
     Json(body): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // Look up user
-    let user: Option<(String, String)> =
-        sqlx::query_as("SELECT username, password_hash FROM users WHERE username = ?")
-            .bind(&body.username)
-            .fetch_optional(&state.db)
-            .await?;
-
-    let (username, password_hash) =
-        user.ok_or_else(|| AppError::from(a_scanner_core::error::CoreError::Unauthorized("Invalid username or password".to_string())))?;
-
-    // Verify password (CPU-intensive, run in blocking thread)
-    let pw = body.password.clone();
-    let hash = password_hash.clone();
-    let valid = tokio::task::spawn_blocking(move || auth_service::verify_password(&pw, &hash))
-        .await
-        .map_err(|e| AppError::from(anyhow::anyhow!("Join error: {}", e)))??;
-
-    if !valid {
-        return Err(a_scanner_core::error::CoreError::Unauthorized(
-            "Invalid username or password".to_string(),
-        ).into());
-    }
-
-    let token = auth_service::generate_jwt(&username, &state.jwt_secret)?;
-    Ok((StatusCode::OK, Json(LoginResponse { token })))
+    let resp = facade::login(&state.core, &body.username, &body.password).await?;
+    Ok((StatusCode::OK, Json(resp)))
 }
 
 /// GET /api/v1/auth/me — return the authenticated user's information.
@@ -66,21 +43,7 @@ async fn change_password_handler(
     auth: AuthUser,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let username = auth.claims.sub.clone();
-    let current = body.current_password.clone();
-    let new_pw = body.new_password.clone();
-    let pool = state.db.clone();
-
-    // Password verification & hashing are CPU-bound
-    tokio::task::spawn_blocking(move || {
-        // We need a new runtime handle to call async from blocking context
-        // Instead, do all sync work here and pass result back
-        let rt = tokio::runtime::Handle::current();
-        rt.block_on(auth_service::change_password(&pool, &username, &current, &new_pw))
-    })
-    .await
-    .map_err(|e| AppError::from(anyhow::anyhow!("Join error: {}", e)))??;
-
+    facade::change_password(&state.core, &auth.claims.sub, &body).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -98,8 +61,6 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, state: &Arc<AppState>) -> Result<Self, Self::Rejection> {
-        let app_state = state.as_ref();
-
         let auth_header = parts
             .headers
             .get("authorization")
@@ -110,7 +71,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
             .strip_prefix("Bearer ")
             .ok_or_else(|| AppError::from(a_scanner_core::error::CoreError::Unauthorized("Invalid authorization header format".to_string())))?;
 
-        let claims = auth_service::validate_jwt(token, &app_state.jwt_secret)?;
+        let claims = facade::validate_token(&state.core, token)?;
         Ok(AuthUser { claims })
     }
 }

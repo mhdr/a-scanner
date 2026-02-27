@@ -9,11 +9,11 @@ use axum::{
 
 use crate::AppState;
 use crate::error::AppError;
+use a_scanner_core::facade;
 use a_scanner_core::models::{
     BulkToggleRequest, CreateProviderRequest, CreateRangeRequest, Provider, ProviderRange,
     ProviderSettings, UpdateProviderRequest, UpdateProviderSettingsRequest, UpdateRangeRequest,
 };
-use a_scanner_core::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -30,7 +30,7 @@ pub fn router() -> Router<Arc<AppState>> {
 async fn list_providers(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<Provider>>, AppError> {
-    let providers = services::provider_service::list_providers(&state.db).await?;
+    let providers = facade::list_providers(&state.core).await?;
     Ok(Json(providers))
 }
 
@@ -39,7 +39,7 @@ async fn get_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Provider>, AppError> {
-    let provider = services::provider_service::get_provider_by_id(&state.db, &id).await?;
+    let provider = facade::get_provider(&state.core, &id).await?;
     Ok(Json(provider))
 }
 
@@ -48,7 +48,7 @@ async fn create_provider(
     State(state): State<Arc<AppState>>,
     Json(body): Json<CreateProviderRequest>,
 ) -> Result<(StatusCode, Json<Provider>), AppError> {
-    let provider = services::provider_service::create_provider(&state.db, &body).await?;
+    let provider = facade::create_provider(&state.core, &body).await?;
     Ok((StatusCode::CREATED, Json(provider)))
 }
 
@@ -58,7 +58,7 @@ async fn update_provider(
     Path(id): Path<String>,
     Json(body): Json<UpdateProviderRequest>,
 ) -> Result<Json<Provider>, AppError> {
-    let provider = services::provider_service::update_provider(&state.db, &id, &body).await?;
+    let provider = facade::update_provider(&state.core, &id, &body).await?;
     Ok(Json(provider))
 }
 
@@ -67,7 +67,7 @@ async fn delete_provider(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    services::provider_service::delete_provider(&state.db, &id).await?;
+    facade::delete_provider(&state.core, &id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -76,7 +76,7 @@ async fn list_ranges(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<ProviderRange>>, AppError> {
-    let ranges = services::provider_service::get_ranges(&state.db, &id).await?;
+    let ranges = facade::get_provider_ranges(&state.core, &id).await?;
     Ok(Json(ranges))
 }
 
@@ -85,7 +85,7 @@ async fn fetch_ranges(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<ProviderRange>>, AppError> {
-    let ranges = services::provider_service::fetch_and_store_ranges(&state.db, &id).await?;
+    let ranges = facade::fetch_provider_ranges(&state.core, &id).await?;
     Ok(Json(ranges))
 }
 
@@ -95,7 +95,7 @@ async fn create_range(
     Path(id): Path<String>,
     Json(body): Json<CreateRangeRequest>,
 ) -> Result<(StatusCode, Json<ProviderRange>), AppError> {
-    let range = services::provider_service::create_custom_range(&state.db, &id, &body).await?;
+    let range = facade::create_custom_range(&state.core, &id, &body).await?;
     Ok((StatusCode::CREATED, Json(range)))
 }
 
@@ -105,7 +105,7 @@ async fn update_range(
     Path((_id, range_id)): Path<(String, String)>,
     Json(body): Json<UpdateRangeRequest>,
 ) -> Result<Json<ProviderRange>, AppError> {
-    let range = services::provider_service::update_range(&state.db, &range_id, &body).await?;
+    let range = facade::update_range(&state.core, &range_id, &body).await?;
     Ok(Json(range))
 }
 
@@ -114,7 +114,7 @@ async fn delete_range(
     State(state): State<Arc<AppState>>,
     Path((_id, range_id)): Path<(String, String)>,
 ) -> Result<StatusCode, AppError> {
-    services::provider_service::delete_range(&state.db, &range_id).await?;
+    facade::delete_range(&state.core, &range_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -124,7 +124,7 @@ async fn bulk_toggle(
     Path(_id): Path<String>,
     Json(body): Json<BulkToggleRequest>,
 ) -> Result<StatusCode, AppError> {
-    services::provider_service::bulk_toggle_ranges(&state.db, &body).await?;
+    facade::bulk_toggle_ranges(&state.core, &body).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -133,7 +133,7 @@ async fn get_settings(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<ProviderSettings>, AppError> {
-    let settings = services::provider_service::get_settings(&state.db, &id).await?;
+    let settings = facade::get_provider_settings(&state.core, &id).await?;
     Ok(Json(settings))
 }
 
@@ -143,6 +143,6 @@ async fn update_settings(
     Path(id): Path<String>,
     Json(body): Json<UpdateProviderSettingsRequest>,
 ) -> Result<Json<ProviderSettings>, AppError> {
-    let settings = services::provider_service::update_settings(&state.db, &id, &body).await?;
+    let settings = facade::update_provider_settings(&state.core, &id, &body).await?;
     Ok(Json(settings))
 }

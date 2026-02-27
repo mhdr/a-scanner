@@ -11,8 +11,8 @@ use axum::{
 use serde::Deserialize;
 
 use crate::AppState;
+use a_scanner_core::facade;
 use a_scanner_core::models::ScanStatus;
-use a_scanner_core::services;
 
 /// Query parameters for WebSocket auth.
 #[derive(Debug, Deserialize)]
@@ -48,7 +48,7 @@ async fn scan_ws_handler(
         }
     };
 
-    if let Err(_) = services::auth_service::validate_jwt(&token, &state.jwt_secret) {
+    if facade::validate_token(&state.core, &token).is_err() {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({ "error": "Invalid or expired token" })),
@@ -58,7 +58,7 @@ async fn scan_ws_handler(
 
     ws.on_upgrade(move |mut socket| async move {
         // Look up the scan in the DB
-        let scan = match services::scan_service::get_scan(&state.db, &scan_id).await {
+        let scan = match facade::get_scan(&state.core, &scan_id).await {
             Ok(s) => s,
             Err(_) => {
                 let _ = socket
@@ -90,7 +90,7 @@ async fn scan_ws_handler(
         }
 
         // Subscribe to the broadcast channel for this scan
-        let mut rx = match state.subscribe_scan(&scan_id).await {
+        let mut rx = match state.core.subscribe_scan(&scan_id).await {
             Some(rx) => rx,
             None => {
                 // No channel yet (scan might still be in pending state).

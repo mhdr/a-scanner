@@ -11,8 +11,8 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
+use a_scanner_core::facade;
 use a_scanner_core::models::{AggregatedIpResult, PaginatedResponse, ScanResult};
-use a_scanner_core::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -40,7 +40,7 @@ pub struct IpFilterParams {
 async fn delete_all_results(
     State(state): State<Arc<AppState>>,
 ) -> Result<StatusCode, AppError> {
-    services::scan_service::delete_all_completed_scans(&state.db).await?;
+    facade::delete_completed_scans(&state.core).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -51,26 +51,15 @@ async fn list_results(
 ) -> Result<Json<PaginatedResponse<ScanResult>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
-    let total = services::result_service::count_results(
-        &state.db,
-        params.reachable_only,
-        params.provider.as_deref(),
-    )
-    .await?;
-    let results = services::result_service::list_results(
-        &state.db,
+    let resp = facade::list_results(
+        &state.core,
         page,
         per_page,
         params.reachable_only,
         params.provider.as_deref(),
     )
     .await?;
-    Ok(Json(PaginatedResponse {
-        data: results,
-        total,
-        page,
-        per_page,
-    }))
+    Ok(Json(resp))
 }
 
 /// GET /api/v1/results/ips — list aggregated (deduplicated) reachable IP results.
@@ -80,24 +69,14 @@ async fn list_aggregated_ips(
 ) -> Result<Json<PaginatedResponse<AggregatedIpResult>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
-    let total = services::result_service::count_aggregated_ips(
-        &state.db,
-        params.provider.as_deref(),
-    )
-    .await?;
-    let results = services::result_service::list_aggregated_ips(
-        &state.db,
+    let resp = facade::list_aggregated_ips(
+        &state.core,
         page,
         per_page,
         params.provider.as_deref(),
     )
     .await?;
-    Ok(Json(PaginatedResponse {
-        data: results,
-        total,
-        page,
-        per_page,
-    }))
+    Ok(Json(resp))
 }
 
 /// GET /api/v1/results/ips/:ip — list all individual scan results for a specific IP.
@@ -108,18 +87,6 @@ async fn get_ip_results(
 ) -> Result<Json<PaginatedResponse<ScanResult>>, AppError> {
     let page = params.page.unwrap_or(1);
     let per_page = params.per_page.unwrap_or(50);
-    let total = services::result_service::count_ip_results(&state.db, &ip).await?;
-    let results = services::result_service::list_ip_results(
-        &state.db,
-        &ip,
-        page,
-        per_page,
-    )
-    .await?;
-    Ok(Json(PaginatedResponse {
-        data: results,
-        total,
-        page,
-        per_page,
-    }))
+    let resp = facade::get_ip_results(&state.core, &ip, page, per_page).await?;
+    Ok(Json(resp))
 }

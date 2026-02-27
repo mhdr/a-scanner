@@ -4,7 +4,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use a_scanner_core::{db, scanner, services};
+use a_scanner_core::facade;
 use a_scanner_web::{AppState, routes};
 
 #[tokio::main]
@@ -19,20 +19,11 @@ async fn main() -> anyhow::Result<()> {
 
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:scanner.db?mode=rwc".to_string());
-    let pool = db::init_pool(&database_url).await?;
 
-    tracing::info!("Database initialized");
-
-    services::auth_service::seed_admin_user(&pool).await?;
-    let jwt_secret = services::auth_service::get_or_create_jwt_secret(&pool).await?;
-
-    let auto_update_pool = pool.clone();
-    tokio::spawn(async move {
-        services::provider_service::run_auto_update_loop(auto_update_pool).await;
-    });
-
-    let tls_connector = scanner::create_tls_connector();
-    let state = AppState::new(pool, tls_connector, jwt_secret);
+    // Single call initializes DB, migrations, admin seeding, JWT secret,
+    // TLS connector, and spawns the provider auto-update loop.
+    let core_state = facade::init(&database_url).await?;
+    let state = AppState::new(core_state);
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
