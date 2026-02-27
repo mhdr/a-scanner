@@ -24,7 +24,7 @@ declare -A TARGET_ABI_MAP=(
 TARGETS=(aarch64-linux-android armv7-linux-androideabi)
 ABIS="armeabi-v7a,arm64-v8a"
 
-CRATE="mobile-backend"
+CRATE="a-scanner-mobile"
 LIB_NAME="libmobile_backend.so"
 JNILIBS_BASE="mobile/android/app/src/main/jniLibs"
 
@@ -60,11 +60,40 @@ fi
 if [ "$SKIP_RUST" = false ]; then
     echo "=== Step 1: Building Rust $CRATE ($PROFILE) ==="
 
+    # --- Locate Android NDK toolchain ----------------------------------
     if [ -z "${ANDROID_NDK_HOME:-}" ]; then
-        echo "⚠  ANDROID_NDK_HOME is not set."
-        echo "   The build will still work if the NDK clang is already on your PATH"
-        echo "   (see .cargo/config.toml)."
+        # Auto-detect: pick the newest NDK under ~/Android/Sdk/ndk
+        NDK_SEARCH="$HOME/Android/Sdk/ndk"
+        if [ -d "$NDK_SEARCH" ]; then
+            ANDROID_NDK_HOME="$(ls -1d "$NDK_SEARCH"/*/ 2>/dev/null | sort -V | tail -1)"
+            ANDROID_NDK_HOME="${ANDROID_NDK_HOME%/}"
+            echo "ℹ  Auto-detected ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+        else
+            echo "✗ ANDROID_NDK_HOME is not set and no NDK found in $NDK_SEARCH"
+            exit 1
+        fi
     fi
+
+    NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    if [ ! -d "$NDK_BIN" ]; then
+        echo "✗ NDK toolchain bin not found at $NDK_BIN"
+        exit 1
+    fi
+
+    # Map Rust target → CC binary name (api-level 31)
+    declare -A TARGET_CC_MAP=(
+        [aarch64-linux-android]="aarch64-linux-android31-clang"
+        [armv7-linux-androideabi]="armv7a-linux-androideabi31-clang"
+    )
+
+    # Export CC_<target> and AR_<target> so the cc crate finds the right compiler
+    for TARGET in "${TARGETS[@]}"; do
+        CC_NAME="${TARGET_CC_MAP[$TARGET]}"
+        # cc crate looks for CC_<target-with-underscores>
+        ENV_SUFFIX="${TARGET//-/_}"
+        export "CC_${ENV_SUFFIX}=${NDK_BIN}/${CC_NAME}"
+        export "AR_${ENV_SUFFIX}=${NDK_BIN}/llvm-ar"
+    done
 
     for TARGET in "${TARGETS[@]}"; do
         ABI="${TARGET_ABI_MAP[$TARGET]}"
@@ -125,6 +154,22 @@ echo ""
 # ---------------------------------------------------------------------------
 
 echo "=== Step 3: Building Android APK ($GRADLE_TASK) ==="
+
+# Ensure ANDROID_HOME is set for Gradle
+if [ -z "${ANDROID_HOME:-}" ]; then
+    export ANDROID_HOME="$HOME/Android/Sdk"
+fi
+if [ ! -d "$ANDROID_HOME" ]; then
+    echo "✗ ANDROID_HOME ($ANDROID_HOME) does not exist."
+    exit 1
+fi
+
+# Generate local.properties if missing
+LOCAL_PROPS="mobile/android/local.properties"
+if [ ! -f "$LOCAL_PROPS" ]; then
+    echo "sdk.dir=$ANDROID_HOME" > "$LOCAL_PROPS"
+fi
+
 cd mobile/android
 ./gradlew "$GRADLE_TASK" -PreactNativeArchitectures="$ABIS"
 cd ../..
