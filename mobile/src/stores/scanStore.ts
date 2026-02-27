@@ -42,7 +42,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   currentResults: [],
   resultsTotal: 0,
   resultsPage: 0,
-  resultsPageSize: 100,
+  resultsPageSize: 200,
   isScansLoading: false,
   isScanLoading: false,
   isResultsLoading: false,

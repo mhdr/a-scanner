@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback } from 'react';
-import { StyleSheet, View, FlatList, RefreshControl } from 'react-native';
+import React, { useEffect, useCallback, useRef } from 'react';
+import { StyleSheet, View, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import {
   Button,
   Card,
@@ -91,12 +91,24 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
     ? (PHASE_LABELS[currentPhase] ?? currentPhase)
     : null;
 
-  const handleLoadMore = () => {
+  // Track whether we're currently loading more to prevent duplicate requests
+  const loadingMoreRef = useRef(false);
+
+  const handleLoadMore = useCallback(() => {
+    if (loadingMoreRef.current || isResultsLoading) return;
     const totalPages = Math.ceil(resultsTotal / resultsPageSize);
     if (resultsPage + 1 < totalPages) {
+      loadingMoreRef.current = true;
       setResultsPagination(resultsPage + 1, resultsPageSize);
     }
-  };
+  }, [resultsTotal, resultsPageSize, resultsPage, isResultsLoading, setResultsPagination]);
+
+  // Reset loadingMore flag when results arrive
+  useEffect(() => {
+    loadingMoreRef.current = false;
+  }, [currentResults.length]);
+
+  const hasMore = currentResults.length < resultsTotal;
 
   const renderResultItem = ({ item }: { item: ScanResult }) => (
     <Card style={styles.resultCard}>
@@ -256,15 +268,24 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
         ) : null
       }
       ListFooterComponent={
-        currentResults.length < resultsTotal ? (
-          <Button onPress={handleLoadMore} style={styles.loadMore}>
-            Load More
-          </Button>
+        hasMore ? (
+          <View style={styles.loadingMore}>
+            <ActivityIndicator size="small" color="#90caf9" />
+            <Text variant="bodySmall" style={styles.dimText}>
+              {currentResults.length} / {resultsTotal} loaded
+            </Text>
+          </View>
+        ) : currentResults.length > 0 ? (
+          <Text variant="bodySmall" style={styles.allLoadedText}>
+            All {resultsTotal} results loaded
+          </Text>
         ) : null
       }
+      onEndReached={hasMore ? handleLoadMore : undefined}
+      onEndReachedThreshold={0.5}
       refreshControl={
         <RefreshControl
-          refreshing={isResultsLoading}
+          refreshing={isResultsLoading && resultsPage === 0}
           onRefresh={refreshData}
           tintColor="#90caf9"
           colors={['#90caf9']}
@@ -278,7 +299,7 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   listContent: {
     padding: 12,
-    paddingBottom: 100,
+    paddingBottom: 150,
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -347,7 +368,16 @@ const styles = StyleSheet.create({
     color: '#9e9e9e',
     marginTop: 24,
   },
-  loadMore: {
-    marginTop: 8,
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 16,
+  },
+  allLoadedText: {
+    textAlign: 'center',
+    color: '#9e9e9e',
+    paddingVertical: 12,
   },
 });
