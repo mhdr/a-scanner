@@ -18,6 +18,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/", get(list_scans).post(create_scan))
         .route("/{id}", get(get_scan))
         .route("/{id}/results", get(get_scan_results))
+        .route("/{id}/stop", axum::routing::post(stop_scan))
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,4 +66,13 @@ async fn get_scan_results(
     let per_page = params.per_page.unwrap_or(50);
     let resp = facade::get_scan_results(&state.core, &id, page, per_page).await?;
     Ok(Json(resp))
+}
+
+/// POST /api/v1/scans/:id/stop — stop a running scan.
+async fn stop_scan(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<Scan>, AppError> {
+    let scan = facade::stop_scan(&state.core, &id).await?;
+    Ok(Json(scan))
 }

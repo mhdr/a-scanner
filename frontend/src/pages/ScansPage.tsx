@@ -29,11 +29,12 @@ import { useProviderStore } from '../stores/providerStore';
 import { useScanPreferencesStore } from '../stores/scanPreferencesStore';
 import type { ScanStatus } from '../types';
 
-const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error'> = {
+const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error' | 'warning'> = {
   pending: 'default',
   running: 'info',
   completed: 'success',
   failed: 'error',
+  stopped: 'warning',
 };
 
 const columns: GridColDef[] = [

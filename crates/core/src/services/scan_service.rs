@@ -89,7 +89,7 @@ pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> R
     Ok(())
 }
 
-/// Delete all completed/failed scans and their results.
+/// Delete all completed/failed/stopped scans and their results.
 /// Running and pending scans are left untouched.
 /// Returns the number of deleted scans (results are cascade-deleted).
 pub async fn delete_all_completed_scans(db: &SqlitePool) -> Result<u64, CoreError> {

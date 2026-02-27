@@ -113,7 +113,7 @@ export function useScanProgress(scanId: string | undefined, active: boolean) {
           });
 
           // When scan finishes, do a final full fetch of results
-          if (event.status === 'completed' || event.status === 'failed') {
+          if (event.status === 'completed' || event.status === 'failed' || event.status === 'stopped') {
             fetchScan(scanId!);
             fetchScanResults(scanId!);
           }

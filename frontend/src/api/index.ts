@@ -1,5 +1,5 @@
 export {
-  listScans, createScan, getScan, getScanResults, listResults,
+  listScans, createScan, getScan, getScanResults, stopScan, listResults,
   listAggregatedIps, getIpResults, deleteAllResults,
   listProviders,
   getProvider, createProvider, updateProvider, deleteProvider,

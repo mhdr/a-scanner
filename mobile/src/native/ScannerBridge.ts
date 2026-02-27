@@ -98,6 +98,12 @@ export async function startScan(req: CreateScanRequest): Promise<Scan> {
   return parseResponse<Scan>(json);
 }
 
+/** Stop a running scan. */
+export async function stopScan(scanId: string): Promise<Scan> {
+  const json: string = await ScannerModule.stopScan(scanId);
+  return parseResponse<Scan>(json);
+}
+
 /** Poll buffered scan progress events. */
 export async function pollScanProgress(
   scanId: string,

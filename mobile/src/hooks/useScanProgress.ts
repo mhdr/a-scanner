@@ -59,7 +59,7 @@ export function useScanProgress(
         });
 
         // Final fetch on terminal status
-        if (event.status === 'completed' || event.status === 'failed') {
+        if (event.status === 'completed' || event.status === 'failed' || event.status === 'stopped') {
           fetchScan(scanId);
           fetchScanResults(scanId);
         }

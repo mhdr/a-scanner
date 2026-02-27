@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Scan, ScanResult, CreateScanRequest } from '../types';
-import { listScans, createScan, getScan, getScanResults } from '../api';
+import { listScans, createScan, getScan, getScanResults, stopScan } from '../api';
 
 interface ScanState {
   scans: Scan[];
@@ -19,6 +19,7 @@ interface ScanState {
   isScanLoading: boolean;
   isResultsLoading: boolean;
   isStarting: boolean;
+  isStopping: boolean;
   error: string | null;
   fetchScans: () => Promise<void>;
   setScansPagination: (page: number, pageSize: number) => void;
@@ -26,6 +27,7 @@ interface ScanState {
   fetchScanResults: (id: string, silent?: boolean) => Promise<void>;
   setResultsPagination: (page: number, pageSize: number) => void;
   startScan: (req: CreateScanRequest) => Promise<void>;
+  stopScan: (id: string) => Promise<void>;
 }
 
 export const useScanStore = create<ScanState>((set, get) => ({
@@ -45,6 +47,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   isScanLoading: false,
   isResultsLoading: false,
   isStarting: false,
+  isStopping: false,
   error: null,
 
   setScansPagination: (page: number, pageSize: number) => {
@@ -100,6 +103,20 @@ export const useScanStore = create<ScanState>((set, get) => ({
       }));
     } catch (err) {
       set({ error: (err as Error).message, isStarting: false });
+    }
+  },
+
+  stopScan: async (id: string) => {
+    set({ isStopping: true, error: null });
+    try {
+      const scan = await stopScan(id);
+      set((state) => ({
+        currentScan: state.currentScan?.id === id ? scan : state.currentScan,
+        scans: state.scans.map((s) => (s.id === id ? scan : s)),
+        isStopping: false,
+      }));
+    } catch (err) {
+      set({ error: (err as Error).message, isStopping: false });
     }
   },
 }));

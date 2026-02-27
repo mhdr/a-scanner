@@ -27,6 +27,7 @@ pub enum ScanStatus {
     Running,
     Completed,
     Failed,
+    Stopped,
 }
 
 impl ScanStatus {
@@ -36,6 +37,7 @@ impl ScanStatus {
             ScanStatus::Running => "running",
             ScanStatus::Completed => "completed",
             ScanStatus::Failed => "failed",
+            ScanStatus::Stopped => "stopped",
         }
     }
 
@@ -45,6 +47,7 @@ impl ScanStatus {
             "running" => ScanStatus::Running,
             "completed" => ScanStatus::Completed,
             "failed" => ScanStatus::Failed,
+            "stopped" => ScanStatus::Stopped,
             _ => ScanStatus::Failed,
         }
     }

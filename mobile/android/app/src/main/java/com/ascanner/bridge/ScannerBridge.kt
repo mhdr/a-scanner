@@ -42,6 +42,9 @@ object ScannerBridge {
     /** Poll buffered scan progress events → JSON {events:[], closed:bool}. */
     external fun pollScanProgress(scanId: String): String
 
+    /** Stop a running scan → JSON Scan. */
+    external fun stopScan(scanId: String): String
+
     /** Get results for a scan → JSON PaginatedResponse<ScanResult>. */
     external fun getScanResults(scanId: String, page: Int, perPage: Int): String
 

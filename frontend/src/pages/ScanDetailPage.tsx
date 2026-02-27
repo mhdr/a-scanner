@@ -16,15 +16,17 @@ import { DataGrid, type GridColDef, type GridPaginationModel } from '@mui/x-data
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import StopIcon from '@mui/icons-material/Stop';
 import { useScanStore } from '../stores/scanStore';
 import { useScanProgress } from '../hooks/useScanProgress';
 import type { ScanStatus } from '../types';
 
-const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error'> = {
+const statusColor: Record<ScanStatus, 'default' | 'info' | 'success' | 'error' | 'warning'> = {
   pending: 'default',
   running: 'info',
   completed: 'success',
   failed: 'error',
+  stopped: 'warning',
 };
 
 const basicColumns: GridColDef[] = [
@@ -117,6 +119,7 @@ const PHASE_LABELS: Record<string, string> = {
   phase2: 'Running extended tests (Phase 2)…',
   done: 'Done',
   failed: 'Failed',
+  stopped: 'Stopped',
 };
 
 export default function ScanDetailPage() {
@@ -127,7 +130,8 @@ export default function ScanDetailPage() {
   const {
     currentScan, currentPhase, extendedDone, extendedTotal,
     currentResults, resultsTotal, resultsPage, resultsPageSize,
-    isResultsLoading, error, fetchScan, fetchScanResults, setResultsPagination,
+    isResultsLoading, isStopping, error, fetchScan, fetchScanResults, setResultsPagination,
+    stopScan,
   } = useScanStore();
 
   const refreshData = useCallback(() => {
@@ -237,6 +241,17 @@ export default function ScanDetailPage() {
                       </Typography>
                     )}
                   </Stack>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    startIcon={<StopIcon />}
+                    onClick={() => id && stopScan(id)}
+                    disabled={isStopping}
+                    sx={{ mt: 1 }}
+                  >
+                    {isStopping ? 'Stopping…' : 'Stop Scan'}
+                  </Button>
                 </Box>
               )}
               <Typography variant="body2" color="text.secondary">

@@ -65,4 +65,5 @@ export const statusColors: Record<string, string> = {
   running: '#42a5f5',
   completed: '#66bb6a',
   failed: '#ef5350',
+  stopped: '#ffa726',
 };

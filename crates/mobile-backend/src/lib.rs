@@ -441,6 +441,23 @@ pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_pollScanProgress(
     })
 }
 
+/// Stop a running scan. Returns the updated `Scan` JSON.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_stopScan(
+    mut env: JNIEnv,
+    _class: JClass,
+    scan_id: JString,
+) -> jstring {
+    safe_jni_call(&mut env, |env| {
+        let id = jstring_to_string(env, &scan_id)?;
+        let result = runtime().block_on(facade::stop_scan(state(), &id));
+        match result {
+            Ok(scan) => Ok(ok_json(env, &scan)),
+            Err(e) => Ok(err_json(env, &e)),
+        }
+    })
+}
+
 /// Get results for a specific scan. Returns `PaginatedResponse<ScanResult>` JSON.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_getScanResults(

@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use futures::stream::{self, StreamExt};
 use sqlx::SqlitePool;
 use tokio::sync::broadcast;
 use tokio_rustls::TlsConnector;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use ipnet::IpNet;
@@ -47,8 +48,15 @@ pub async fn run_scan(
     pool: SqlitePool,
     tls_connector: Arc<TlsConnector>,
     tx: broadcast::Sender<ScanProgressEvent>,
+    cancel_token: CancellationToken,
 ) {
-    if let Err(e) = run_scan_inner(&scan_id, &config, &pool, &tls_connector, &tx).await {
+    if let Err(e) = run_scan_inner(&scan_id, &config, &pool, &tls_connector, &tx, &cancel_token).await {
+        // If the scan was cancelled, treat it as a stop rather than a failure
+        if cancel_token.is_cancelled() {
+            tracing::info!("Scan {} was stopped by user", scan_id);
+            // Status should already be set to Stopped inside run_scan_inner
+            return;
+        }
         tracing::error!("Scan {} failed: {}", scan_id, e);
         let _ = update_scan_status(&pool, &scan_id, ScanStatus::Failed).await;
         // Fetch the latest scan data from DB so we preserve the real progress counts
@@ -124,6 +132,7 @@ async fn run_scan_inner(
     pool: &SqlitePool,
     tls_connector: &Arc<TlsConnector>,
     tx: &broadcast::Sender<ScanProgressEvent>,
+    cancel_token: &CancellationToken,
 ) -> anyhow::Result<()> {
     // Resolve provider
     let provider = get_provider_from_db(pool, &config.provider_id)
@@ -175,6 +184,11 @@ async fn run_scan_inner(
     emit_progress(tx, scan_id, "running", 0, 0, total_ips, "phase1");
     tracing::info!("Scan {}: starting Phase 1 with {} IPs", scan_id, total_ips);
 
+    // Check cancellation before starting Phase 1
+    if cancel_token.is_cancelled() {
+        return handle_cancellation(pool, scan_id, tx, &Arc::new(tokio::sync::Mutex::new(HashMap::new())), 0, 0, total_ips).await;
+    }
+
     // Raise file descriptor limit for high concurrency
     let fd_buffer = 100u64;
     let desired_fds = config.concurrency as u64 + fd_buffer;
@@ -202,6 +216,17 @@ async fn run_scan_inner(
     let all_results: Arc<tokio::sync::Mutex<HashMap<String, PendingResult>>> =
         Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 
+    // Shared cancellation flag checked by each probe task
+    let cancelled = Arc::new(AtomicBool::new(false));
+    {
+        let cancelled = cancelled.clone();
+        let token = cancel_token.clone();
+        tokio::spawn(async move {
+            token.cancelled().await;
+            cancelled.store(true, Ordering::Relaxed);
+        });
+    }
+
     let port = config.port;
     let timeout_ms = config.timeout_ms;
     let scan_id_owned = scan_id.to_string();
@@ -217,8 +242,14 @@ async fn run_scan_inner(
             let results_map = all_results.clone();
             let scan_id = scan_id_owned.clone();
             let tx = tx_clone.clone();
+            let cancelled = cancelled.clone();
 
             async move {
+                // Skip probing if scan has been cancelled
+                if cancelled.load(Ordering::Relaxed) {
+                    return;
+                }
+
                 let result = probe_ip(ip, port, timeout_ms).await;
                 let count = scanned.fetch_add(1, Ordering::Relaxed) + 1;
 
@@ -284,6 +315,11 @@ async fn run_scan_inner(
     }
     emit_progress(tx, scan_id, "running", total_ips, working_count, total_ips, "phase1_done");
 
+    // Check cancellation after Phase 1
+    if cancel_token.is_cancelled() {
+        return handle_cancellation(pool, scan_id, tx, &all_results, total_ips, working_count, total_ips).await;
+    }
+
     // Phase 2: Extended tests (if enabled)
     if config.extended && !reachable.is_empty() {
         // Phase 1.5: Quick verify — filter out IPs that are TCP-reachable but
@@ -307,7 +343,11 @@ async fn run_scan_inner(
             .map(|(ip, tcp_ms)| {
                 let connector = connector_verify.clone();
                 let sni = sni_verify.clone();
+                let cancelled = cancelled.clone();
                 async move {
+                    if cancelled.load(Ordering::Relaxed) {
+                        return (ip, tcp_ms, false);
+                    }
                     let ok = quick_verify_ip(ip, verify_port, &sni, verify_timeout, &connector).await;
                     (ip, tcp_ms, ok)
                 }
@@ -361,6 +401,11 @@ async fn run_scan_inner(
         }
         emit_progress(tx, scan_id, "running", total_ips, verified_count, total_ips, "quick_verify_done");
 
+        // Check cancellation after quick verify
+        if cancel_token.is_cancelled() {
+            return handle_cancellation(pool, scan_id, tx, &all_results, total_ips, verified_count, total_ips).await;
+        }
+
         if reachable.is_empty() {
             tracing::info!("Scan {}: no IPs passed quick verify, skipping Phase 2", scan_id);
             // Flush all results to DB before completing
@@ -400,8 +445,14 @@ async fn run_scan_inner(
                 let ext_done = ext_done_count.clone();
                 let scan_id = scan_id_p2.clone();
                 let tx = tx_p2.clone();
+                let cancelled = cancelled.clone();
 
                 async move {
+                    // Skip extended test if scan has been cancelled
+                    if cancelled.load(Ordering::Relaxed) {
+                        return;
+                    }
+
                     let result = run_extended_tests(
                         ip, tcp_ms, port, &sni, ext_timeout, samples, packet_loss_probes, &connector,
                     )
@@ -449,6 +500,13 @@ async fn run_scan_inner(
             .await?;
     }
 
+    // Check cancellation before final flush
+    if cancel_token.is_cancelled() {
+        return handle_cancellation(pool, scan_id, tx, &all_results, total_ips,
+            services::scan_service::get_scan(pool, scan_id).await.map(|s| s.working_ips).unwrap_or(0),
+            total_ips).await;
+    }
+
     // Flush all accumulated results to the database in bulk
     tracing::info!("Scan {}: writing {} results to database...", scan_id, all_results.lock().await.len());
     flush_all_results(pool, scan_id, &all_results.lock().await).await?;
@@ -462,6 +520,41 @@ async fn run_scan_inner(
     emit_progress(tx, scan_id, "completed", total_ips, final_working, total_ips, "done");
     tracing::info!("Scan {} completed successfully", scan_id);
 
+    Ok(())
+}
+
+/// Handle scan cancellation: flush collected results, update status, emit event.
+async fn handle_cancellation(
+    pool: &SqlitePool,
+    scan_id: &str,
+    tx: &broadcast::Sender<ScanProgressEvent>,
+    all_results: &Arc<tokio::sync::Mutex<HashMap<String, PendingResult>>>,
+    scanned_ips: i64,
+    working_ips: i64,
+    total_ips: i64,
+) -> anyhow::Result<()> {
+    tracing::info!("Scan {}: stopping — flushing {} results collected so far", scan_id, all_results.lock().await.len());
+
+    // Flush whatever results we've collected
+    let results = all_results.lock().await;
+    if !results.is_empty() {
+        if let Err(e) = flush_all_results(pool, scan_id, &results).await {
+            tracing::warn!("Scan {}: failed to flush results on stop: {}", scan_id, e);
+        }
+    }
+    drop(results);
+
+    // Update scanned_ips in DB
+    let _ = sqlx::query("UPDATE scans SET scanned_ips = ?, updated_at = ? WHERE id = ?")
+        .bind(scanned_ips)
+        .bind(chrono::Utc::now().to_rfc3339())
+        .bind(scan_id)
+        .execute(pool)
+        .await;
+
+    update_scan_status(pool, scan_id, ScanStatus::Stopped).await?;
+    emit_progress(tx, scan_id, "stopped", scanned_ips, working_ips, total_ips, "stopped");
+    tracing::info!("Scan {} stopped successfully", scan_id);
     Ok(())
 }
 

@@ -1,5 +1,5 @@
 /// Scan job status.
-export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type ScanStatus = 'pending' | 'running' | 'completed' | 'failed' | 'stopped';
 
 /// A scan job.
 export interface Scan {

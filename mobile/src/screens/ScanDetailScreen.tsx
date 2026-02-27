@@ -27,6 +27,7 @@ const PHASE_LABELS: Record<string, string> = {
   phase2: 'Running extended tests (Phase 2)...',
   done: 'Done',
   failed: 'Failed',
+  stopped: 'Stopped',
 };
 
 export default function ScanDetailScreen({ route, navigation }: Props) {
@@ -41,10 +42,12 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
     resultsPage,
     resultsPageSize,
     isResultsLoading,
+    isStopping,
     error,
     fetchScan,
     fetchScanResults,
     setResultsPagination,
+    stopScan,
   } = useScanStore();
 
   const refreshData = useCallback(() => {
@@ -207,6 +210,18 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
                     </Text>
                   )}
                 </View>
+                <Button
+                  mode="outlined"
+                  icon="stop"
+                  onPress={() => stopScan(scanId)}
+                  loading={isStopping}
+                  disabled={isStopping}
+                  textColor="#ef5350"
+                  style={styles.stopButton}
+                  compact
+                >
+                  {isStopping ? 'Stopping...' : 'Stop Scan'}
+                </Button>
               </View>
             )}
 
@@ -289,6 +304,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 4,
+  },
+  stopButton: {
+    marginTop: 8,
+    borderColor: '#ef5350',
+    alignSelf: 'flex-start',
   },
   resultsTitle: {
     marginTop: 8,

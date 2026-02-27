@@ -106,6 +106,10 @@ export async function getScanResults(
   return request(`/api/v1/scans/${id}/results${toQuery((params ?? {}) as Record<string, unknown>)}`);
 }
 
+export async function stopScan(id: string): Promise<Scan> {
+  return request(`/api/v1/scans/${id}/stop`, { method: 'POST' });
+}
+
 // --- Results ---
 
 export async function listResults(params?: ResultFilterParams): Promise<PaginatedResponse<ScanResult>> {

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use sqlx::SqlitePool;
 use tokio::sync::{broadcast, Mutex};
 use tokio_rustls::TlsConnector;
+use tokio_util::sync::CancellationToken;
 
 use crate::error::CoreError;
 use crate::models::{
@@ -42,6 +43,8 @@ pub struct CoreState {
     pub jwt_secret: Vec<u8>,
     /// Per-scan broadcast channels keyed by scan ID.
     scan_channels: Arc<Mutex<HashMap<String, broadcast::Sender<ScanProgressEvent>>>>,
+    /// Per-scan cancellation tokens keyed by scan ID.
+    cancel_tokens: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 impl CoreState {
@@ -55,6 +58,7 @@ impl CoreState {
             tls_connector: Arc::new(tls_connector),
             jwt_secret,
             scan_channels: Arc::new(Mutex::new(HashMap::new())),
+            cancel_tokens: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -62,13 +66,18 @@ impl CoreState {
     pub async fn create_scan_channel(
         &self,
         scan_id: &str,
-    ) -> broadcast::Sender<ScanProgressEvent> {
+    ) -> (broadcast::Sender<ScanProgressEvent>, CancellationToken) {
         let (tx, _) = broadcast::channel(256);
+        let token = CancellationToken::new();
         self.scan_channels
             .lock()
             .await
             .insert(scan_id.to_string(), tx.clone());
-        tx
+        self.cancel_tokens
+            .lock()
+            .await
+            .insert(scan_id.to_string(), token.clone());
+        (tx, token)
     }
 
     /// Subscribe to an existing scan's broadcast channel.
@@ -88,6 +97,19 @@ impl CoreState {
     /// Remove a scan's broadcast channel (called after the scan finishes).
     pub async fn remove_scan_channel(&self, scan_id: &str) {
         self.scan_channels.lock().await.remove(scan_id);
+        self.cancel_tokens.lock().await.remove(scan_id);
+    }
+
+    /// Cancel a running scan by triggering its cancellation token.
+    ///
+    /// Returns `true` if the scan had a cancellation token (i.e. was running).
+    pub async fn cancel_scan(&self, scan_id: &str) -> bool {
+        if let Some(token) = self.cancel_tokens.lock().await.get(scan_id) {
+            token.cancel();
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -230,7 +252,7 @@ pub async fn start_scan(
     };
 
     let scan_id = scan.id.clone();
-    let tx = state.create_scan_channel(&scan_id).await;
+    let (tx, cancel_token) = state.create_scan_channel(&scan_id).await;
     let rx = tx.subscribe();
 
     let pool = state.db.clone();
@@ -238,11 +260,40 @@ pub async fn start_scan(
     let state_clone = state.clone();
 
     tokio::spawn(async move {
-        run_scan(scan_id.clone(), config, pool, tls, tx).await;
+        run_scan(scan_id.clone(), config, pool, tls, tx, cancel_token).await;
         state_clone.remove_scan_channel(&scan_id).await;
     });
 
     Ok((scan, rx))
+}
+
+/// Stop a running scan.
+///
+/// Signals the scan to stop via its cancellation token. The scan will flush
+/// any results collected so far to the database and mark itself as `stopped`.
+/// Returns an error if the scan is not found or not currently running.
+pub async fn stop_scan(state: &CoreState, scan_id: &str) -> Result<Scan, CoreError> {
+    let scan = scan_service::get_scan(&state.db, scan_id).await?;
+    if scan.status != "running" && scan.status != "pending" {
+        return Err(CoreError::BadRequest(format!(
+            "Scan {} is not running (status: {})",
+            scan_id, scan.status
+        )));
+    }
+
+    let cancelled = state.cancel_scan(scan_id).await;
+    if !cancelled {
+        return Err(CoreError::BadRequest(format!(
+            "Scan {} has no active cancellation token",
+            scan_id
+        )));
+    }
+
+    // The orchestrator will handle updating the DB status to "stopped"
+    // and flushing results. Re-fetch the scan after a brief delay to
+    // return updated state.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    scan_service::get_scan(&state.db, scan_id).await
 }
 
 /// Get results for a specific scan with pagination.

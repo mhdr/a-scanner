@@ -81,6 +81,11 @@ class ScannerModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun stopScan(scanId: String, promise: Promise) {
+        runOnBackground(promise) { ScannerBridge.stopScan(scanId) }
+    }
+
+    @ReactMethod
     fun getScanResults(scanId: String, page: Int, perPage: Int, promise: Promise) {
         runOnBackground(promise) { ScannerBridge.getScanResults(scanId, page, perPage) }
     }
