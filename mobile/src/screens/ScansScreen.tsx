@@ -4,6 +4,7 @@ import {
   View,
   FlatList,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Banner,
@@ -11,8 +12,8 @@ import {
   Card,
   Chip,
   Divider,
+  Icon,
   IconButton,
-  List,
   Menu,
   Switch,
   Text,
@@ -209,103 +210,134 @@ export default function ScansScreen({ navigation }: Props) {
             </Button>
           </View>
 
-          {/* Advanced settings */}
-          <List.Accordion
-            title="Advanced Settings"
-            left={(aProps) => <List.Icon {...aProps} icon="cog" />}
-            expanded={prefs.showAdvanced}
+          {/* Advanced settings toggle */}
+          <TouchableOpacity
+            activeOpacity={0.7}
             onPress={() => prefs.setShowAdvanced(!prefs.showAdvanced)}
+            style={styles.advancedToggle}
           >
-            <View style={styles.advancedGrid}>
+            <View style={styles.advancedToggleInner}>
+              <Icon source="cog" size={18} color="#9e9e9e" />
+              <Text variant="labelLarge" style={styles.advancedToggleText}>
+                Advanced Settings
+              </Text>
+            </View>
+            <Icon
+              source={prefs.showAdvanced ? 'chevron-up' : 'chevron-down'}
+              size={22}
+              color="#9e9e9e"
+            />
+          </TouchableOpacity>
+
+          {prefs.showAdvanced && (
+            <View style={styles.advancedContainer}>
+              {/* Scan parameters */}
+              <Text variant="labelSmall" style={styles.sectionLabel}>
+                Scan Parameters
+              </Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  label="Concurrency"
+                  keyboardType="numeric"
+                  value={String(prefs.concurrency)}
+                  onChangeText={(v) => prefs.setConcurrency(Number(v) || 0)}
+                  style={styles.halfInput}
+                  mode="outlined"
+                  dense
+                />
+                <TextInput
+                  label="Timeout (ms)"
+                  keyboardType="numeric"
+                  value={String(prefs.timeoutMs)}
+                  onChangeText={(v) => prefs.setTimeoutMs(Number(v) || 0)}
+                  style={styles.halfInput}
+                  mode="outlined"
+                  dense
+                />
+              </View>
+              <View style={styles.inputRow}>
+                <TextInput
+                  label="Port"
+                  keyboardType="numeric"
+                  value={String(prefs.port)}
+                  onChangeText={(v) => prefs.setPort(Number(v) || 0)}
+                  style={styles.halfInput}
+                  mode="outlined"
+                  dense
+                />
+              </View>
+
+              {prefs.extended && (
+                <>
+                  <Divider style={styles.advancedDivider} />
+                  <Text variant="labelSmall" style={styles.sectionLabel}>
+                    Extended Parameters
+                  </Text>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      label="Samples"
+                      keyboardType="numeric"
+                      value={String(prefs.samples)}
+                      onChangeText={(v) => prefs.setSamples(Number(v) || 0)}
+                      style={styles.halfInput}
+                      mode="outlined"
+                      dense
+                    />
+                    <TextInput
+                      label="Concurrency"
+                      keyboardType="numeric"
+                      value={String(prefs.extendedConcurrency)}
+                      onChangeText={(v) =>
+                        prefs.setExtendedConcurrency(Number(v) || 0)
+                      }
+                      style={styles.halfInput}
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      label="Timeout (ms)"
+                      keyboardType="numeric"
+                      value={String(prefs.extendedTimeoutMs)}
+                      onChangeText={(v) =>
+                        prefs.setExtendedTimeoutMs(Number(v) || 0)
+                      }
+                      style={styles.halfInput}
+                      mode="outlined"
+                      dense
+                    />
+                    <TextInput
+                      label="Loss Probes"
+                      keyboardType="numeric"
+                      value={String(prefs.packetLossProbes)}
+                      onChangeText={(v) =>
+                        prefs.setPacketLossProbes(Number(v) || 0)
+                      }
+                      style={styles.halfInput}
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                </>
+              )}
+
+              <Divider style={styles.advancedDivider} />
+              <Text variant="labelSmall" style={styles.sectionLabel}>
+                Custom IP Ranges
+              </Text>
               <TextInput
-                label="Concurrency"
-                keyboardType="numeric"
-                value={String(prefs.concurrency)}
-                onChangeText={(v) => prefs.setConcurrency(Number(v) || 0)}
-                style={styles.smallInput}
-                dense
-              />
-              <TextInput
-                label="Timeout (ms)"
-                keyboardType="numeric"
-                value={String(prefs.timeoutMs)}
-                onChangeText={(v) => prefs.setTimeoutMs(Number(v) || 0)}
-                style={styles.smallInput}
-                dense
-              />
-              <TextInput
-                label="Port"
-                keyboardType="numeric"
-                value={String(prefs.port)}
-                onChangeText={(v) => prefs.setPort(Number(v) || 0)}
-                style={styles.smallInput}
+                label="CIDR Notation"
+                multiline
+                numberOfLines={3}
+                value={prefs.ipRanges}
+                onChangeText={prefs.setIpRanges}
+                placeholder={'1.0.0.0/24\n1.1.1.0/24'}
+                mode="outlined"
                 dense
               />
             </View>
-
-            {prefs.extended && (
-              <>
-                <Divider style={styles.divider} />
-                <Text
-                  variant="labelSmall"
-                  style={[styles.dimText, { marginBottom: 8 }]}
-                >
-                  Extended Settings
-                </Text>
-                <View style={styles.advancedGrid}>
-                  <TextInput
-                    label="Samples"
-                    keyboardType="numeric"
-                    value={String(prefs.samples)}
-                    onChangeText={(v) => prefs.setSamples(Number(v) || 0)}
-                    style={styles.smallInput}
-                    dense
-                  />
-                  <TextInput
-                    label="Ext. Concurrency"
-                    keyboardType="numeric"
-                    value={String(prefs.extendedConcurrency)}
-                    onChangeText={(v) =>
-                      prefs.setExtendedConcurrency(Number(v) || 0)
-                    }
-                    style={styles.smallInput}
-                    dense
-                  />
-                  <TextInput
-                    label="Ext. Timeout (ms)"
-                    keyboardType="numeric"
-                    value={String(prefs.extendedTimeoutMs)}
-                    onChangeText={(v) =>
-                      prefs.setExtendedTimeoutMs(Number(v) || 0)
-                    }
-                    style={styles.smallInput}
-                    dense
-                  />
-                  <TextInput
-                    label="Loss Probes"
-                    keyboardType="numeric"
-                    value={String(prefs.packetLossProbes)}
-                    onChangeText={(v) =>
-                      prefs.setPacketLossProbes(Number(v) || 0)
-                    }
-                    style={styles.smallInput}
-                    dense
-                  />
-                </View>
-              </>
-            )}
-
-            <TextInput
-              label="Custom IP Ranges (CIDR)"
-              multiline
-              numberOfLines={3}
-              value={prefs.ipRanges}
-              onChangeText={prefs.setIpRanges}
-              placeholder={'1.0.0.0/24\n1.1.1.0/24'}
-              style={styles.ipRangesInput}
-              dense
-            />
-          </List.Accordion>
+          )}
         </Card.Content>
       </Card>
 
@@ -393,21 +425,46 @@ const styles = StyleSheet.create({
   providerButton: {
     minWidth: 140,
   },
-  advancedGrid: {
+  advancedToggle: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#333',
+    marginTop: 4,
+  },
+  advancedToggleInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
   },
-  smallInput: {
+  advancedToggleText: {
+    color: '#9e9e9e',
+  },
+  advancedContainer: {
+    backgroundColor: '#181818',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 4,
+    gap: 8,
+  },
+  sectionLabel: {
+    color: '#90caf9',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: -2,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  halfInput: {
     flex: 1,
-    minWidth: 100,
   },
-  divider: {
-    marginVertical: 8,
-  },
-  ipRangesInput: {
-    marginTop: 8,
+  advancedDivider: {
+    backgroundColor: '#333',
+    marginVertical: 4,
   },
   summaryCard: {
     marginBottom: 8,
