@@ -5,6 +5,7 @@ import {
   FlatList,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Appbar,
@@ -15,14 +16,13 @@ import {
   Dialog,
   Divider,
   FAB,
+  Icon,
   IconButton,
-  List,
   Portal,
   Switch,
   Text,
   TextInput,
 } from 'react-native-paper';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useProviderStore } from '../stores/providerStore';
 import type {
   Provider,
@@ -381,159 +381,190 @@ function ProviderDetail({ provider }: { provider: Provider }) {
   };
 
   const renderRangeItem = ({ item }: { item: ProviderRange }) => (
-    <Card style={styles.rangeCard}>
-      <Card.Content style={styles.rangeContent}>
-        <View style={styles.rangeLeft}>
-          <Checkbox
-            status={item.enabled ? 'checked' : 'unchecked'}
-            onPress={() => handleToggleRange(item)}
-          />
-          <View style={styles.rangeInfo}>
-            <Text variant="bodyMedium" style={styles.monospace}>
-              {item.cidr}
-            </Text>
-            <Text variant="bodySmall" style={styles.dimText}>
-              {item.ip_count.toLocaleString()} IPs
-              {item.is_custom ? ' · Custom' : ' · Auto'}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.rangeActions}>
-          <IconButton
-            icon="pencil"
-            size={18}
-            onPress={() => {
-              setActiveRange(item);
-              setEditRangeOpen(true);
-            }}
-          />
-          <IconButton
-            icon="delete"
-            size={18}
-            iconColor="#ef5350"
-            onPress={() => {
-              setActiveRange(item);
-              setDeleteRangeOpen(true);
-            }}
-          />
-        </View>
-      </Card.Content>
-    </Card>
+    <View style={[styles.rangeItem, !item.enabled && styles.rangeItemDisabled]}>
+      <Checkbox
+        status={item.enabled ? 'checked' : 'unchecked'}
+        onPress={() => handleToggleRange(item)}
+      />
+      <View style={styles.rangeInfo}>
+        <Text
+          variant="bodyMedium"
+          style={[styles.monospace, !item.enabled && styles.dimText]}
+        >
+          {item.cidr}
+        </Text>
+        <Text variant="bodySmall" style={styles.dimText}>
+          {item.ip_count.toLocaleString()} IPs
+          {item.is_custom && (
+            <Text style={styles.customBadge}> · Custom</Text>
+          )}
+        </Text>
+      </View>
+      <IconButton
+        icon="pencil-outline"
+        size={16}
+        onPress={() => {
+          setActiveRange(item);
+          setEditRangeOpen(true);
+        }}
+      />
+      <IconButton
+        icon="delete-outline"
+        size={16}
+        iconColor="#ef5350"
+        onPress={() => {
+          setActiveRange(item);
+          setDeleteRangeOpen(true);
+        }}
+      />
+    </View>
   );
 
   return (
     <View style={styles.flex1}>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      {/* Provider header */}
-      <View style={styles.providerHeader}>
-        <View style={styles.titleRow}>
-          <Text variant="titleLarge">{provider.name}</Text>
-          {provider.is_builtin && (
-            <Chip compact icon="lock" style={styles.builtinChip}>
-              Built-in
-            </Chip>
+      {/* Provider info card */}
+      <Card style={styles.detailInfoCard} mode="contained">
+        <Card.Content>
+          <View style={styles.titleRow}>
+            <View style={styles.titleLeft}>
+              <Icon source="dns" size={22} color="#90caf9" />
+              <Text variant="titleMedium" style={styles.titleText}>
+                {provider.name}
+              </Text>
+            </View>
+            <View style={styles.titleRight}>
+              {provider.is_builtin && (
+                <Chip compact icon="lock" style={styles.builtinChip} textStyle={styles.builtinChipText}>
+                  Built-in
+                </Chip>
+              )}
+              <IconButton
+                icon="pencil"
+                size={18}
+                onPress={() => setEditProviderOpen(true)}
+              />
+            </View>
+          </View>
+          {provider.description ? (
+            <Text variant="bodySmall" style={styles.descText}>
+              {provider.description}
+            </Text>
+          ) : null}
+          <View style={styles.metaRow}>
+            <View style={styles.metaItem}>
+              <Icon source="web" size={14} color="#9e9e9e" />
+              <Text variant="bodySmall" style={styles.dimText}>
+                {provider.sni}
+              </Text>
+            </View>
+            {parsedUrls.length > 0 && (
+              <View style={styles.metaItem}>
+                <Icon source="link" size={14} color="#9e9e9e" />
+                <Text variant="bodySmall" style={styles.dimText}>
+                  {parsedUrls.length} source{parsedUrls.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+            <View style={styles.metaItem}>
+              <Icon source="file-document-outline" size={14} color="#9e9e9e" />
+              <Text variant="bodySmall" style={styles.dimText}>
+                {provider.response_format === 'json' ? 'JSON' : 'Plain'}
+              </Text>
+            </View>
+          </View>
+        </Card.Content>
+      </Card>
+
+      {/* Settings card */}
+      <Card style={styles.detailSettingsCard} mode="outlined">
+        <Card.Content>
+          <View style={styles.settingHeader}>
+            <Icon source="cog" size={16} color="#90caf9" />
+            <Text variant="labelSmall" style={styles.sectionLabel}>
+              SETTINGS
+            </Text>
+          </View>
+          <View style={styles.settingRow}>
+            <Text variant="bodyMedium">Auto-update ranges</Text>
+            <Switch
+              value={providerSettings?.auto_update ?? false}
+              onValueChange={(v) => saveSettings(provider.id, { auto_update: v })}
+            />
+          </View>
+          {providerSettings?.auto_update && (
+            <View style={styles.settingRow}>
+              <Text variant="bodyMedium">Interval (hours)</Text>
+              <TextInput
+                keyboardType="numeric"
+                value={String(providerSettings?.auto_update_interval_hours ?? 24)}
+                onChangeText={(v) =>
+                  saveSettings(provider.id, {
+                    auto_update_interval_hours: Number(v) || 24,
+                  })
+                }
+                mode="outlined"
+                dense
+                style={styles.intervalInput}
+                contentStyle={styles.intervalInputContent}
+              />
+            </View>
           )}
-          <IconButton
-            icon="pencil"
-            size={18}
-            onPress={() => setEditProviderOpen(true)}
-          />
-        </View>
-        {provider.description ? (
-          <Text variant="bodySmall" style={styles.dimText}>
-            {provider.description}
+          <Text variant="bodySmall" style={styles.lastFetchedText}>
+            Last fetched:{' '}
+            {providerSettings?.last_fetched_at
+              ? new Date(providerSettings.last_fetched_at).toLocaleString()
+              : 'Never'}
           </Text>
-        ) : null}
-        <Text variant="bodySmall" style={styles.dimText}>
-          SNI: {provider.sni}
-          {parsedUrls.length > 0 && ` | ${parsedUrls.length} source URLs`}
-          {` | Format: ${provider.response_format === 'json' ? 'JSON' : 'Plain'}`}
-        </Text>
-      </View>
+        </Card.Content>
+      </Card>
 
-      <Divider />
-
-      {/* Settings section */}
-      <View style={styles.settingsRow}>
-        <View style={styles.switchRow}>
-          <Text variant="bodyMedium">Auto-update</Text>
-          <Switch
-            value={providerSettings?.auto_update ?? false}
-            onValueChange={(v) => saveSettings(provider.id, { auto_update: v })}
+      {/* Ranges header with actions */}
+      <View style={styles.rangesHeader}>
+        <View style={styles.rangesHeaderLeft}>
+          <Text variant="labelSmall" style={styles.sectionLabel}>
+            IP RANGES
+          </Text>
+          {totalRanges > 0 && (
+            <Text variant="bodySmall" style={styles.dimText}>
+              {enabledRanges.length}/{totalRanges} enabled · {enabledIps.toLocaleString()} IPs
+            </Text>
+          )}
+        </View>
+        <View style={styles.rangesHeaderActions}>
+          <IconButton
+            icon="cloud-download"
+            size={20}
+            onPress={handleFetchFromSource}
+            disabled={rangesLoading || parsedUrls.length === 0}
+          />
+          <IconButton
+            icon="plus"
+            size={20}
+            onPress={() => setAddOpen(true)}
+          />
+          <IconButton
+            icon="refresh"
+            size={20}
+            onPress={loadData}
+            disabled={rangesLoading}
           />
         </View>
-        {providerSettings?.auto_update && (
-          <TextInput
-            label="Interval (hours)"
-            keyboardType="numeric"
-            value={String(providerSettings?.auto_update_interval_hours ?? 24)}
-            onChangeText={(v) =>
-              saveSettings(provider.id, {
-                auto_update_interval_hours: Number(v) || 24,
-              })
-            }
-            mode="outlined"
-            dense
-            style={styles.intervalInput}
-          />
-        )}
-        <Text variant="bodySmall" style={styles.dimText}>
-          Last fetched:{' '}
-          {providerSettings?.last_fetched_at
-            ? new Date(providerSettings.last_fetched_at).toLocaleString()
-            : 'Never'}
-        </Text>
       </View>
 
-      <Divider />
-
-      {/* Action buttons */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionBar}>
-        <Button
-          icon="cloud-download"
-          mode="contained"
-          compact
-          onPress={handleFetchFromSource}
-          disabled={rangesLoading || parsedUrls.length === 0}
-          style={styles.actionButton}
-        >
-          Fetch
-        </Button>
-        <Button
-          icon="plus"
-          mode="outlined"
-          compact
-          onPress={() => setAddOpen(true)}
-          style={styles.actionButton}
-        >
-          Add
-        </Button>
-        <Button
-          compact
-          onPress={handleEnableAll}
-          disabled={totalRanges === 0}
-          style={styles.actionButton}
-        >
-          Enable All
-        </Button>
-        <Button
-          compact
-          onPress={handleDisableAll}
-          disabled={totalRanges === 0}
-          style={styles.actionButton}
-        >
-          Disable All
-        </Button>
-        <IconButton icon="refresh" onPress={loadData} disabled={rangesLoading} />
-      </ScrollView>
-
-      {/* Summary */}
+      {/* Bulk toggle row */}
       {totalRanges > 0 && (
-        <Text variant="bodySmall" style={[styles.dimText, styles.rangeSummary]}>
-          {totalRanges} ranges · {enabledIps.toLocaleString()} /{' '}
-          {totalIps.toLocaleString()} IPs enabled
-        </Text>
+        <View style={styles.bulkRow}>
+          <TouchableOpacity onPress={handleEnableAll} style={styles.bulkButton}>
+            <Icon source="checkbox-multiple-marked" size={16} color="#66bb6a" />
+            <Text variant="labelSmall" style={styles.bulkButtonText}>Enable All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDisableAll} style={styles.bulkButton}>
+            <Icon source="checkbox-multiple-blank-outline" size={16} color="#9e9e9e" />
+            <Text variant="labelSmall" style={styles.bulkButtonTextDim}>Disable All</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Ranges list */}
@@ -543,7 +574,13 @@ function ProviderDetail({ provider }: { provider: Provider }) {
         renderItem={renderRangeItem}
         ListEmptyComponent={
           !rangesLoading ? (
-            <Text style={styles.emptyText}>No ranges. Fetch from source or add manually.</Text>
+            <View style={styles.emptyContainer}>
+              <Icon source="ip-network-outline" size={48} color="#555" />
+              <Text style={styles.emptyText}>No ranges yet</Text>
+              <Text variant="bodySmall" style={styles.dimText}>
+                Fetch from source or add manually
+              </Text>
+            </View>
           ) : null
         }
         refreshControl={
@@ -685,39 +722,70 @@ export default function ProvidersScreen() {
         renderItem={({ item }) => {
           const pRanges = ranges[item.id] ?? [];
           const enabledCount = pRanges.filter((r) => r.enabled).length;
+          const totalIps = pRanges.reduce((sum, r) => sum + r.ip_count, 0);
           return (
-            <List.Item
-              title={item.name}
-              description={
-                pRanges.length > 0
-                  ? `${enabledCount}/${pRanges.length} ranges · SNI: ${item.sni}`
-                  : `SNI: ${item.sni}`
-              }
-              left={(props) => <List.Icon {...props} icon="dns" />}
-              right={() =>
-                !item.is_builtin ? (
-                  <IconButton
-                    icon="delete"
-                    iconColor="#ef5350"
-                    size={20}
-                    onPress={() => setDeleteTarget(item)}
-                  />
-                ) : (
-                  <Chip compact icon="lock" style={styles.builtinChip}>
-                    Built-in
-                  </Chip>
-                )
-              }
+            <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => selectProvider(item.id)}
-              style={styles.providerListItem}
-            />
+              style={styles.providerCard}
+            >
+              <View style={styles.providerCardInner}>
+                <View style={styles.providerCardIcon}>
+                  <Icon source="dns" size={24} color="#90caf9" />
+                </View>
+                <View style={styles.providerCardContent}>
+                  <View style={styles.providerCardTitleRow}>
+                    <Text variant="titleSmall">{item.name}</Text>
+                    {item.is_builtin && (
+                      <Chip compact icon="lock" style={styles.builtinChip} textStyle={styles.builtinChipText}>
+                        Built-in
+                      </Chip>
+                    )}
+                  </View>
+                  <Text variant="bodySmall" style={styles.dimText}>
+                    SNI: {item.sni}
+                  </Text>
+                  {pRanges.length > 0 && (
+                    <View style={styles.providerCardStats}>
+                      <View style={styles.statItem}>
+                        <Icon source="ip-network-outline" size={12} color="#9e9e9e" />
+                        <Text variant="bodySmall" style={styles.dimText}>
+                          {enabledCount}/{pRanges.length} ranges
+                        </Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Icon source="server-network" size={12} color="#9e9e9e" />
+                        <Text variant="bodySmall" style={styles.dimText}>
+                          {totalIps.toLocaleString()} IPs
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.providerCardRight}>
+                  {!item.is_builtin && (
+                    <IconButton
+                      icon="delete-outline"
+                      iconColor="#ef5350"
+                      size={20}
+                      onPress={() => setDeleteTarget(item)}
+                    />
+                  )}
+                  <Icon source="chevron-right" size={20} color="#555" />
+                </View>
+              </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
           !isLoading ? (
-            <Text style={styles.emptyText}>
-              No providers yet. Tap + to add one.
-            </Text>
+            <View style={styles.emptyContainer}>
+              <Icon source="dns" size={48} color="#555" />
+              <Text style={styles.emptyText}>No providers yet</Text>
+              <Text variant="bodySmall" style={styles.dimText}>
+                Tap + to add one
+              </Text>
+            </View>
           ) : null
         }
         refreshControl={
@@ -763,77 +831,198 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 80,
-  },
-  providerListItem: {
-    paddingVertical: 4,
-  },
-  providerHeader: {
     padding: 12,
+    paddingBottom: 80,
+    gap: 8,
+  },
+  // ── Provider list card ──
+  providerCard: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  providerCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
+  },
+  providerCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1a2740',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerCardContent: {
+    flex: 1,
+    gap: 2,
+  },
+  providerCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  providerCardStats: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 2,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
+  },
+  providerCardRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // ── Detail view ──
+  detailInfoCard: {
+    margin: 12,
+    marginBottom: 8,
+    backgroundColor: '#1e1e1e',
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+    flex: 1,
+  },
+  titleRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  titleText: {
+    flex: 1,
+  },
+  descText: {
+    color: '#bbb',
+    marginTop: 4,
+    marginLeft: 30,
+  },
+  metaRow: {
+    flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+    marginLeft: 30,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   builtinChip: {
-    height: 28,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#90caf9',
   },
-  settingsRow: {
-    padding: 12,
-    gap: 8,
+  builtinChipText: {
+    fontSize: 10,
+    color: '#90caf9',
   },
-  switchRow: {
+  // ── Settings card ──
+  detailSettingsCard: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderColor: '#333',
+  },
+  settingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    color: '#90caf9',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   intervalInput: {
-    width: 140,
+    width: 80,
+    height: 36,
+    textAlign: 'center',
   },
-  actionBar: {
-    flexGrow: 0,
+  intervalInputContent: {
     paddingHorizontal: 8,
-    paddingVertical: 6,
   },
-  actionButton: {
-    marginHorizontal: 4,
+  lastFetchedText: {
+    color: '#777',
+    marginTop: 6,
   },
-  rangeSummary: {
-    paddingHorizontal: 12,
-    paddingBottom: 4,
+  // ── Ranges header ──
+  rangesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  rangesHeaderLeft: {
+    gap: 2,
+  },
+  rangesHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bulkRow: {
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 6,
+  },
+  bulkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  bulkButtonText: {
+    color: '#66bb6a',
+  },
+  bulkButtonTextDim: {
+    color: '#9e9e9e',
+  },
+  // ── Range item ──
+  rangeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingRight: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2a2a2a',
+  },
+  rangeItemDisabled: {
+    opacity: 0.5,
+  },
+  rangeInfo: {
+    flex: 1,
+    marginLeft: 2,
+  },
+  customBadge: {
+    color: '#ce93d8',
+  },
+  monospace: {
+    fontFamily: 'monospace',
   },
   rangesList: {
     paddingHorizontal: 8,
     paddingBottom: 16,
   },
-  rangeCard: {
-    marginVertical: 3,
-  },
-  rangeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  rangeLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  rangeInfo: {
-    flex: 1,
-    marginLeft: 4,
-  },
-  rangeActions: {
-    flexDirection: 'row',
-  },
-  monospace: {
-    fontFamily: 'monospace',
-  },
+  // ── Common ──
   dimText: {
     color: '#9e9e9e',
   },
@@ -841,11 +1030,14 @@ const styles = StyleSheet.create({
     color: '#ef5350',
     padding: 12,
   },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 48,
+    gap: 8,
+  },
   emptyText: {
     textAlign: 'center',
     color: '#9e9e9e',
-    marginTop: 32,
-    paddingHorizontal: 24,
   },
   fab: {
     position: 'absolute',
@@ -857,6 +1049,12 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 8,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
   fieldError: {
     color: '#ef5350',
