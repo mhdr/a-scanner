@@ -21,14 +21,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_TARGET: aarch64-linux-android
   NDK_VERSION: 27.1.12297006
   # Minimum Android API level for the NDK clang linker suffix
   ANDROID_API: 31
 
 jobs:
   build-android:
-    name: Build Android APK (arm64-v8a)
+    name: Build Android APK (arm64-v8a + armeabi-v7a)
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -70,7 +69,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ env.RUST_TARGET }}
+          targets: aarch64-linux-android,armv7-linux-androideabi
 
       - name: Cache Rust build artifacts
         uses: actions/cache@v4
@@ -82,20 +81,20 @@ jobs:
           key: rust-android-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: rust-android-
 
-      # ── Build Rust .so ───────────────────────────────────────────────
-      - name: Build mobile-backend (release)
-        run: |
-          cargo build \
-            --target ${{ env.RUST_TARGET }} \
-            -p mobile-backend \
-            --release
+      # ── Build Rust .so (both ABIs) ────────────────────────────────────
+      - name: Build mobile-backend for arm64-v8a
+        run: cargo build --target aarch64-linux-android -p mobile-backend --release
+
+      - name: Build mobile-backend for armeabi-v7a
+        run: cargo build --target armv7-linux-androideabi -p mobile-backend --release
 
       - name: Copy libmobile_backend.so to jniLibs
         run: |
-          JNILIBS="mobile/android/app/src/main/jniLibs/arm64-v8a"
-          mkdir -p "$JNILIBS"
-          cp "target/${{ env.RUST_TARGET }}/release/libmobile_backend.so" "$JNILIBS/"
-          ls -lh "$JNILIBS/"
+          JNILIBS_BASE="mobile/android/app/src/main/jniLibs"
+          mkdir -p "$JNILIBS_BASE/arm64-v8a" "$JNILIBS_BASE/armeabi-v7a"
+          cp target/aarch64-linux-android/release/libmobile_backend.so "$JNILIBS_BASE/arm64-v8a/"
+          cp target/armv7-linux-androideabi/release/libmobile_backend.so "$JNILIBS_BASE/armeabi-v7a/"
+          ls -lhR "$JNILIBS_BASE/"
 
       # ── Install JS dependencies ──────────────────────────────────────
       - name: Install mobile npm dependencies
@@ -118,7 +117,7 @@ jobs:
           ASCANNER_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           ASCANNER_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           ASCANNER_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       # ── Upload artifact ──────────────────────────────────────────────
       - name: Upload APK artifact

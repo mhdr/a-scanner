@@ -4,7 +4,7 @@
 # Prerequisites:
 #   - Android NDK installed, ANDROID_NDK_HOME set (or NDK clang on PATH)
 #   - Android SDK with build-tools & platform matching mobile/android/build.gradle
-#   - Rust target installed: rustup target add aarch64-linux-android
+#   - Rust targets: rustup target add aarch64-linux-android armv7-linux-androideabi
 #   - Node.js >= 22 and npm
 #   - Java 17+ (for Gradle)
 #
@@ -16,10 +16,17 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-TARGET="aarch64-linux-android"
+# Rust target → Android ABI mapping
+declare -A TARGET_ABI_MAP=(
+    [aarch64-linux-android]=arm64-v8a
+    [armv7-linux-androideabi]=armeabi-v7a
+)
+TARGETS=(aarch64-linux-android armv7-linux-androideabi)
+ABIS="armeabi-v7a,arm64-v8a"
+
 CRATE="mobile-backend"
 LIB_NAME="libmobile_backend.so"
-JNILIBS_DIR="mobile/android/app/src/main/jniLibs/arm64-v8a"
+JNILIBS_BASE="mobile/android/app/src/main/jniLibs"
 
 PROFILE="release"
 SKIP_RUST=false
@@ -47,16 +54,11 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 1: Build Rust .so (unless --skip-rust)
+# Step 1: Build Rust .so for each target (unless --skip-rust)
 # ---------------------------------------------------------------------------
 
 if [ "$SKIP_RUST" = false ]; then
-    echo "=== Step 1: Building Rust $CRATE for $TARGET ($PROFILE) ==="
-
-    if ! rustup target list --installed | grep -q "$TARGET"; then
-        echo "→ Installing Rust target $TARGET …"
-        rustup target add "$TARGET"
-    fi
+    echo "=== Step 1: Building Rust $CRATE ($PROFILE) ==="
 
     if [ -z "${ANDROID_NDK_HOME:-}" ]; then
         echo "⚠  ANDROID_NDK_HOME is not set."
@@ -64,30 +66,46 @@ if [ "$SKIP_RUST" = false ]; then
         echo "   (see .cargo/config.toml)."
     fi
 
-    if [ "$PROFILE" = "release" ]; then
-        cargo build --target "$TARGET" -p "$CRATE" --release
-        SO_PATH="target/$TARGET/release/$LIB_NAME"
-    else
-        cargo build --target "$TARGET" -p "$CRATE"
-        SO_PATH="target/$TARGET/debug/$LIB_NAME"
-    fi
+    for TARGET in "${TARGETS[@]}"; do
+        ABI="${TARGET_ABI_MAP[$TARGET]}"
+        JNILIBS_DIR="$JNILIBS_BASE/$ABI"
 
-    if [ ! -f "$SO_PATH" ]; then
-        echo "✗ Build succeeded but $SO_PATH not found."
-        exit 1
-    fi
+        echo ""
+        echo "→ Building for $TARGET ($ABI) …"
 
-    mkdir -p "$JNILIBS_DIR"
-    cp "$SO_PATH" "$JNILIBS_DIR/$LIB_NAME"
+        if ! rustup target list --installed | grep -q "$TARGET"; then
+            echo "  Installing Rust target $TARGET …"
+            rustup target add "$TARGET"
+        fi
 
-    SIZE=$(du -h "$JNILIBS_DIR/$LIB_NAME" | cut -f1)
-    echo "✓ $LIB_NAME ($SIZE) → $JNILIBS_DIR/"
+        if [ "$PROFILE" = "release" ]; then
+            cargo build --target "$TARGET" -p "$CRATE" --release
+            SO_PATH="target/$TARGET/release/$LIB_NAME"
+        else
+            cargo build --target "$TARGET" -p "$CRATE"
+            SO_PATH="target/$TARGET/debug/$LIB_NAME"
+        fi
+
+        if [ ! -f "$SO_PATH" ]; then
+            echo "✗ Build succeeded but $SO_PATH not found."
+            exit 1
+        fi
+
+        mkdir -p "$JNILIBS_DIR"
+        cp "$SO_PATH" "$JNILIBS_DIR/$LIB_NAME"
+
+        SIZE=$(du -h "$JNILIBS_DIR/$LIB_NAME" | cut -f1)
+        echo "  ✓ $LIB_NAME ($SIZE) → $JNILIBS_DIR/"
+    done
 else
     echo "=== Step 1: Skipping Rust build (--skip-rust) ==="
-    if [ ! -f "$JNILIBS_DIR/$LIB_NAME" ]; then
-        echo "✗ $JNILIBS_DIR/$LIB_NAME not found. Run without --skip-rust first."
-        exit 1
-    fi
+    for TARGET in "${TARGETS[@]}"; do
+        ABI="${TARGET_ABI_MAP[$TARGET]}"
+        if [ ! -f "$JNILIBS_BASE/$ABI/$LIB_NAME" ]; then
+            echo "✗ $JNILIBS_BASE/$ABI/$LIB_NAME not found. Run without --skip-rust first."
+            exit 1
+        fi
+    done
 fi
 
 echo ""
@@ -108,7 +126,7 @@ echo ""
 
 echo "=== Step 3: Building Android APK ($GRADLE_TASK) ==="
 cd mobile/android
-./gradlew "$GRADLE_TASK" -PreactNativeArchitectures=arm64-v8a
+./gradlew "$GRADLE_TASK" -PreactNativeArchitectures="$ABIS"
 cd ../..
 
 # ---------------------------------------------------------------------------

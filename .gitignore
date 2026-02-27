@@ -17,6 +17,7 @@
 
 # Mobile build artifacts (built by build-mobile.sh, not committed)
 /mobile/android/app/src/main/jniLibs/arm64-v8a/libmobile_backend.so
+/mobile/android/app/src/main/jniLibs/armeabi-v7a/libmobile_backend.so
 /mobile/android/app/build/
 
 # Environment
