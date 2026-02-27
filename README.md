@@ -40,7 +40,7 @@ The Rust backend is organized as a **Cargo workspace** with three crates:
 | Core Library     | Rust, Tokio, SQLite (sqlx), rustls                              |
 | Web Backend      | Rust, Axum 0.8, tower-http, rust-embed                         |
 | Mobile Backend   | Rust, JNI 0.21 (cdylib → `libmobile_backend.so`)               |
-| Web Frontend     | React 19, TypeScript, MUI 7, Zustand 5, Vite, React Router 7   |
+| Web Frontend     | React 19, TypeScript, MUI 7, Zustand 5, Vite 7, React Router 7, ECharts 6 |
 | Mobile App       | React Native 0.84, TypeScript, React Native Paper, Zustand 5   |
 | Auth             | Argon2, JWT (jsonwebtoken)                                      |
 | Build            | Cargo workspace, Vite (web), Gradle + React Native CLI (mobile) |
@@ -262,14 +262,18 @@ All endpoints are under `/api/v1/`. Authentication is required for all routes ex
 | `GET`  | `/api/v1/scans` | List scans (paginated) |
 | `POST` | `/api/v1/scans` | Create and start a new scan |
 | `GET`  | `/api/v1/scans/{id}` | Get scan details |
+| `POST` | `/api/v1/scans/{id}/stop` | Stop a running scan |
 | `GET`  | `/api/v1/scans/{id}/results` | Get scan results (paginated) |
-| `GET`  | `/api/v1/scans/{id}/ws?token=<jwt>` | WebSocket for real-time progress |
+| `DELETE` | `/api/v1/scans` | Delete completed scans |
+| `GET`  | `/api/v1/ws/scans/{id}?token=<jwt>` | WebSocket for real-time progress |
 
 ### Results
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/api/v1/results` | List all results (filter by `reachable_only`, `provider`) |
+| `GET`  | `/api/v1/results/aggregated` | List aggregated IP results |
+| `GET`  | `/api/v1/results/ip/{ip}` | Get results for a specific IP |
 
 ### Providers
 
@@ -335,8 +339,8 @@ a-scanner/
 │   └── src/
 │       ├── api/                  # HTTP fetch wrappers
 │       ├── components/           # Layout, dialogs
-│       ├── hooks/                # useScanProgress (WS + polling)
-│       ├── pages/                # Login, Scans, ScanDetail, Providers, Results
+│       ├── hooks/                # useScanProgress (WebSocket-based)
+│       ├── pages/                # Login, Scans, ScanDetail, Providers, Results, IpDetail
 │       ├── stores/               # Zustand stores (HTTP-based)
 │       └── types/                # TypeScript type definitions
 │
@@ -346,10 +350,10 @@ a-scanner/
     │       ├── java/com/ascanner/
     │       │   ├── bridge/       # ScannerBridge.kt (JNI declarations)
     │       │   └── modules/      # ScannerModule.kt (RN Native Module)
-    │       └── jniLibs/arm64-v8a/  # libmobile_backend.so (built artifact)
+    │       └── jniLibs/          # libmobile_backend.so (arm64-v8a + armeabi-v7a)
     └── src/
         ├── native/               # TypeScript JNI bridge wrapper
-        ├── screens/              # Login, Scans, ScanDetail, Providers, Results
+        ├── screens/              # Scans, ScanDetail, Providers, Results, IpDetail
         ├── stores/               # Zustand stores (JNI-based)
         └── types/                # Shared type definitions
 ```
