@@ -23,7 +23,7 @@ export function useScanProgress(
 ) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
-  const { fetchScan, fetchScanResults } = useScanStore();
+  const { fetchScan, fetchScanResults, fetchScans } = useScanStore();
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -43,15 +43,24 @@ export function useScanProgress(
         useScanStore.setState((state) => {
           const scan = state.currentScan;
           if (!scan || scan.id !== event.scan_id) return state;
+
+          const updatedScan = {
+            ...scan,
+            status: event.status,
+            scanned_ips: event.scanned_ips,
+            working_ips: event.working_ips,
+            total_ips: event.total_ips,
+          };
+
           return {
             ...state,
-            currentScan: {
-              ...scan,
-              status: event.status,
-              scanned_ips: event.scanned_ips,
-              working_ips: event.working_ips,
-              total_ips: event.total_ips,
-            },
+            currentScan: updatedScan,
+            // Also update the scan in the scans list so ScansScreen stays in sync
+            scans: state.scans.map((s) =>
+              s.id === event.scan_id
+                ? { ...s, status: event.status, scanned_ips: event.scanned_ips, working_ips: event.working_ips, total_ips: event.total_ips }
+                : s,
+            ),
             currentPhase: event.phase,
             extendedDone: event.extended_done ?? state.extendedDone,
             extendedTotal: event.extended_total ?? state.extendedTotal,
@@ -63,6 +72,7 @@ export function useScanProgress(
           useScanStore.getState().setResultsPagination(0, useScanStore.getState().resultsPageSize);
           fetchScan(scanId);
           fetchScanResults(scanId);
+          fetchScans();
         }
       }
 
@@ -73,7 +83,7 @@ export function useScanProgress(
     } catch {
       // Ignore poll errors — will retry on next interval
     }
-  }, [scanId, fetchScan, fetchScanResults, stopPolling]);
+  }, [scanId, fetchScan, fetchScanResults, fetchScans, stopPolling]);
 
   const startPolling = useCallback(() => {
     if (pollRef.current) return; // already polling
