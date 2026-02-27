@@ -278,7 +278,7 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   listContent: {
     padding: 12,
-    paddingBottom: 24,
+    paddingBottom: 80,
   },
   backButton: {
     alignSelf: 'flex-start',
