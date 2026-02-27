@@ -178,33 +178,6 @@ export interface UpdateProviderSettingsRequest {
   auto_update_interval_hours?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Authentication
-// ---------------------------------------------------------------------------
-
-/// Request body for logging in.
-export interface LoginRequest {
-  username: string;
-  password: string;
-}
-
-/// Response body after successful login.
-export interface LoginResponse {
-  token: string;
-}
-
-/// Request body for changing password.
-export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
-}
-
-/// JWT claims returned by validateToken.
-export interface Claims {
-  sub: string;
-  exp: number;
-}
-
 /// Poll scan progress response.
 export interface PollProgressResponse {
   events: ScanProgressEvent[];

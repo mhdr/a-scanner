@@ -57,25 +57,6 @@ class ScannerModule(reactContext: ReactApplicationContext) :
     }
 
     // -----------------------------------------------------------------------
-    // Auth
-    // -----------------------------------------------------------------------
-
-    @ReactMethod
-    fun login(username: String, password: String, promise: Promise) {
-        runOnBackground(promise) { ScannerBridge.login(username, password) }
-    }
-
-    @ReactMethod
-    fun validateToken(token: String, promise: Promise) {
-        runOnBackground(promise) { ScannerBridge.validateToken(token) }
-    }
-
-    @ReactMethod
-    fun changePassword(username: String, reqJson: String, promise: Promise) {
-        runOnBackground(promise) { ScannerBridge.changePassword(username, reqJson) }
-    }
-
-    // -----------------------------------------------------------------------
     // Scans
     // -----------------------------------------------------------------------
 

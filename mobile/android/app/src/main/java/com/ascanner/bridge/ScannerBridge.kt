@@ -27,19 +27,6 @@ object ScannerBridge {
     external fun raiseFdLimit(): String
 
     // -----------------------------------------------------------------------
-    // Auth
-    // -----------------------------------------------------------------------
-
-    /** Authenticate → JSON LoginResponse {"token":"…"} */
-    external fun login(username: String, password: String): String
-
-    /** Validate a JWT token → JSON Claims. */
-    external fun validateToken(token: String): String
-
-    /** Change password → JSON {"ok":true} or error. */
-    external fun changePassword(username: String, reqJson: String): String
-
-    // -----------------------------------------------------------------------
     // Scans
     // -----------------------------------------------------------------------
 

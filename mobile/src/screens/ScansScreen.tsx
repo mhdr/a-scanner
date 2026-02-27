@@ -22,7 +22,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useScanStore } from '../stores/scanStore';
 import { useProviderStore } from '../stores/providerStore';
 import { useScanPreferencesStore } from '../stores/scanPreferencesStore';
-import { useAuthStore } from '../stores/authStore';
+import { useAppStore } from '../stores/appStore';
 import { statusColors } from '../theme';
 import type { Scan, ScanStatus } from '../types';
 import type { ScansStackParamList } from '../App';
@@ -30,7 +30,7 @@ import type { ScansStackParamList } from '../App';
 type Props = NativeStackScreenProps<ScansStackParamList, 'ScansList'>;
 
 export default function ScansScreen({ navigation }: Props) {
-  const { rootAvailable } = useAuthStore();
+  const { rootAvailable } = useAppStore();
   const {
     scans,
     scansTotal,

@@ -15,11 +15,9 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { paperTheme, navigationTheme } from './theme';
-import { useAuthStore } from './stores/authStore';
-import ChangePasswordDialog from './components/ChangePasswordDialog';
+import { useAppStore } from './stores/appStore';
 
 // Screens
-import LoginScreen from './screens/LoginScreen';
 import ScansScreen from './screens/ScansScreen';
 import ScanDetailScreen from './screens/ScanDetailScreen';
 import ProvidersScreen from './screens/ProvidersScreen';
@@ -78,8 +76,7 @@ type DrawerParamList = {
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const { username, rootAvailable, logout } = useAuthStore();
-  const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
+  const { rootAvailable } = useAppStore();
 
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
@@ -88,11 +85,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         <Text variant="titleMedium" style={styles.appTitle}>
           α-scanner
         </Text>
-        {username && (
-          <Text variant="bodySmall" style={styles.dimText}>
-            Logged in as {username}
-          </Text>
-        )}
         {!rootAvailable && (
           <Text variant="bodySmall" style={styles.warningText}>
             ⚠ Root access unavailable
@@ -126,31 +118,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
           Results
         </Button>
       </View>
-
-      <View style={styles.drawerFooter}>
-        <Button
-          icon="lock-reset"
-          mode="text"
-          compact
-          onPress={() => setChangePasswordOpen(true)}
-        >
-          Change Password
-        </Button>
-        <Button
-          icon="logout"
-          mode="text"
-          compact
-          textColor="#ef5350"
-          onPress={logout}
-        >
-          Logout
-        </Button>
-      </View>
-
-      <ChangePasswordDialog
-        visible={changePasswordOpen}
-        onDismiss={() => setChangePasswordOpen(false)}
-      />
     </DrawerContentScrollView>
   );
 }
@@ -197,9 +164,8 @@ export default function App() {
   const {
     isInitialised,
     isInitialising,
-    isAuthenticated,
     initApp,
-  } = useAuthStore();
+  } = useAppStore();
 
   useEffect(() => {
     initApp();
@@ -225,8 +191,6 @@ export default function App() {
                 Initializing...
               </Text>
             </View>
-          ) : !isAuthenticated ? (
-            <LoginScreen />
           ) : (
             <MainApp />
           )}
@@ -273,12 +237,6 @@ const styles = StyleSheet.create({
   },
   drawerButton: {
     justifyContent: 'flex-start',
-  },
-  drawerFooter: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    padding: 12,
-    gap: 4,
   },
   dimText: {
     color: '#9e9e9e',

@@ -13,8 +13,6 @@ import type {
   ProviderSettings,
   AggregatedIpResult,
   PaginatedResponse,
-  LoginResponse,
-  Claims,
   CreateScanRequest,
   CreateProviderRequest,
   UpdateProviderRequest,
@@ -22,7 +20,6 @@ import type {
   UpdateRangeRequest,
   BulkToggleRequest,
   UpdateProviderSettingsRequest,
-  ChangePasswordRequest,
   PollProgressResponse,
 } from '../types';
 
@@ -74,37 +71,6 @@ export interface RaiseFdLimitResult {
 export async function raiseFdLimit(): Promise<RaiseFdLimitResult> {
   const json: string = await ScannerModule.raiseFdLimit();
   return parseResponse<RaiseFdLimitResult>(json);
-}
-
-// ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-/** Authenticate and return a JWT token. */
-export async function login(
-  username: string,
-  password: string,
-): Promise<LoginResponse> {
-  const json: string = await ScannerModule.login(username, password);
-  return parseResponse<LoginResponse>(json);
-}
-
-/** Validate a JWT token and return claims. */
-export async function validateToken(token: string): Promise<Claims> {
-  const json: string = await ScannerModule.validateToken(token);
-  return parseResponse<Claims>(json);
-}
-
-/** Change password for a user. */
-export async function changePassword(
-  username: string,
-  req: ChangePasswordRequest,
-): Promise<void> {
-  const json: string = await ScannerModule.changePassword(
-    username,
-    JSON.stringify(req),
-  );
-  parseResponse<{ ok: boolean }>(json);
 }
 
 // ---------------------------------------------------------------------------

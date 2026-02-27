@@ -306,69 +306,6 @@ pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_raiseFdLimit(
 }
 
 // ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-/// Authenticate and return a JWT token as JSON: `{"token":"…"}`.
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_login(
-    mut env: JNIEnv,
-    _class: JClass,
-    username: JString,
-    password: JString,
-) -> jstring {
-    safe_jni_call(&mut env, |env| {
-        let u = jstring_to_string(env, &username)?;
-        let p = jstring_to_string(env, &password)?;
-        let result = runtime().block_on(facade::login(state(), &u, &p));
-        match result {
-            Ok(resp) => Ok(ok_json(env, &resp)),
-            Err(e) => Ok(err_json(env, &e)),
-        }
-    })
-}
-
-/// Validate a JWT token and return the claims as JSON.
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_validateToken(
-    mut env: JNIEnv,
-    _class: JClass,
-    token: JString,
-) -> jstring {
-    safe_jni_call(&mut env, |env| {
-        let t = jstring_to_string(env, &token)?;
-        match facade::validate_token(state(), &t) {
-            Ok(claims) => Ok(ok_json(env, &claims)),
-            Err(e) => Ok(err_json(env, &e)),
-        }
-    })
-}
-
-/// Change the password for the given user.
-///
-/// `req_json` is a JSON `ChangePasswordRequest`:
-/// `{"current_password":"…","new_password":"…"}`
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_ascanner_bridge_ScannerBridge_changePassword(
-    mut env: JNIEnv,
-    _class: JClass,
-    username: JString,
-    req_json: JString,
-) -> jstring {
-    safe_jni_call(&mut env, |env| {
-        let u = jstring_to_string(env, &username)?;
-        let json = jstring_to_string(env, &req_json)?;
-        let req: a_scanner_core::models::ChangePasswordRequest =
-            serde_json::from_str(&json).map_err(|e| format!("Invalid JSON: {e}"))?;
-        let result = runtime().block_on(facade::change_password(state(), &u, &req));
-        match result {
-            Ok(()) => Ok(ok_void(env)),
-            Err(e) => Ok(err_json(env, &e)),
-        }
-    })
-}
-
-// ---------------------------------------------------------------------------
 // Scans
 // ---------------------------------------------------------------------------
 
