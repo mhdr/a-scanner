@@ -8,7 +8,7 @@ interface ScanPreferencesState {
   extended: boolean;
   showAdvanced: boolean;
 
-  // Basic parameters (mobile defaults: lower concurrency)
+  // Basic parameters
   concurrency: number;
   timeoutMs: number;
   port: number;
@@ -42,12 +42,11 @@ export const useScanPreferencesStore = create<ScanPreferencesState>()(
       selectedProvider: 'cloudflare',
       extended: false,
       showAdvanced: false,
-      // Mobile defaults — lower concurrency to conserve battery
-      concurrency: 500,
+      concurrency: 3000,
       timeoutMs: 2000,
       port: 443,
       samples: 10,
-      extendedConcurrency: 100,
+      extendedConcurrency: 200,
       extendedTimeoutMs: 10000,
       packetLossProbes: 10,
       ipRanges: '',
