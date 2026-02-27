@@ -199,7 +199,7 @@ pub async fn fetch_and_store_ranges(
     for url in provider.ip_range_urls() {
         let nets = fetch_cidr_list(url, format)
             .await
-            .map_err(|e| CoreError::Internal(e))?;
+            .map_err(CoreError::Internal)?;
         for net in &nets {
             all_cidrs.push((net.to_string(), cidr_ip_count(net)));
         }

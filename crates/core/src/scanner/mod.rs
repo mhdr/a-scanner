@@ -340,6 +340,7 @@ pub async fn quick_verify_ip(
 }
 
 /// Run extended tests on a single IP with multiple samples for stability measurement.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_extended_tests(
     ip: IpAddr,
     tcp_ms: u64,

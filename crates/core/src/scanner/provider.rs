@@ -64,8 +64,7 @@ pub fn expand_ranges(ranges: &[IpNet], ipv4_only: bool) -> Vec<IpAddr> {
                 if ipv4_only {
                     continue;
                 }
-                let mut count = 0u64;
-                for ip in net.hosts() {
+                for (count, ip) in net.hosts().enumerate() {
                     if count >= 65536 {
                         tracing::warn!(
                             "IPv6 range {} has too many IPs, limiting to first 65536",
@@ -74,7 +73,6 @@ pub fn expand_ranges(ranges: &[IpNet], ipv4_only: bool) -> Vec<IpAddr> {
                         break;
                     }
                     ips.push(IpAddr::V6(ip));
-                    count += 1;
                 }
             }
         }

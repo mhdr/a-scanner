@@ -94,6 +94,7 @@ fn emit_progress(
 }
 
 /// Emit a progress event with extended-test progress info.
+#[allow(clippy::too_many_arguments)]
 fn emit_progress_ext(
     tx: &broadcast::Sender<ScanProgressEvent>,
     scan_id: &str,
@@ -247,7 +248,7 @@ async fn run_scan_inner(
                 results_map.lock().await.insert(ip_str, row);
 
                 // Emit progress periodically to avoid flooding WS clients
-                if count % progress_interval == 0 || count == total_ips as u64 {
+                if count.is_multiple_of(progress_interval) || count == total_ips as u64 {
                     let w = working.load(Ordering::Relaxed) as i64;
                     emit_progress(&tx, &scan_id, "running", count as i64, w, total_ips, "phase1");
                 }
@@ -421,7 +422,7 @@ async fn run_scan_inner(
 
                     // Emit Phase 2 progress periodically
                     let done = ext_done.fetch_add(1, Ordering::Relaxed) + 1;
-                    if done % ext_progress_interval == 0 || done == extended_total as u64 {
+                    if done.is_multiple_of(ext_progress_interval) || done == extended_total as u64 {
                         emit_progress_ext(
                             &tx, &scan_id, "running",
                             total_ips, verified_count, total_ips,

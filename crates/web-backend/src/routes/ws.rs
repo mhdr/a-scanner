@@ -68,7 +68,7 @@ async fn scan_ws_handler(
             }
         };
 
-        let status = ScanStatus::from_str(&scan.status);
+        let status = ScanStatus::parse(&scan.status);
 
         // If scan is already finished, send final state and close
         if status == ScanStatus::Completed || status == ScanStatus::Failed {
