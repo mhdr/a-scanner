@@ -2,7 +2,6 @@ use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use std::str::FromStr;
 
-/// Initialize the SQLite database connection pool and run migrations.
 pub async fn init_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(database_url)?
         .journal_mode(SqliteJournalMode::Wal)
@@ -15,8 +14,7 @@ pub async fn init_pool(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
         .connect_with(options)
         .await?;
 
-    // Run embedded migrations
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    sqlx::migrate!("../../migrations").run(&pool).await?;
 
     Ok(pool)
 }

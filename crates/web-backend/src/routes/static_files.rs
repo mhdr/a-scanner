@@ -8,7 +8,7 @@ use rust_embed::Embed;
 /// Embedded frontend assets built from the React app.
 /// The path is relative to the Cargo.toml directory.
 #[derive(Embed)]
-#[folder = "../frontend/dist"]
+#[folder = "../../frontend/dist"]
 struct FrontendAssets;
 
 /// Returns an appropriate Cache-Control header value for the given path.

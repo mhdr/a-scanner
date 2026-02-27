@@ -15,11 +15,9 @@ cd ..
 
 echo ""
 echo "=== Building backend (release, static musl) ==="
-cd backend
-cargo build --release --target x86_64-unknown-linux-musl
-cd ..
+cargo build -p a-scanner-web --release --target x86_64-unknown-linux-musl
 
-BINARY="backend/target/x86_64-unknown-linux-musl/release/a-scanner"
+BINARY="target/x86_64-unknown-linux-musl/release/a-scanner"
 
 if [ -f "$BINARY" ]; then
   echo ""

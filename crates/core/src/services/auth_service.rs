@@ -6,30 +6,30 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, Algorithm};
 use rand::Rng;
 use sqlx::SqlitePool;
 
-use crate::error::AppError;
+use crate::error::CoreError;
 use crate::models::Claims;
 
 /// Hash a plaintext password with argon2.
-pub fn hash_password(password: &str) -> Result<String, AppError> {
+pub fn hash_password(password: &str) -> Result<String, CoreError> {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let hash = argon2
         .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Password hashing failed: {}", e)))?;
+        .map_err(|e| CoreError::Internal(anyhow::anyhow!("Password hashing failed: {}", e)))?;
     Ok(hash.to_string())
 }
 
 /// Verify a plaintext password against an argon2 hash.
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, CoreError> {
     let parsed = PasswordHash::new(hash)
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Invalid password hash: {}", e)))?;
+        .map_err(|e| CoreError::Internal(anyhow::anyhow!("Invalid password hash: {}", e)))?;
     Ok(Argon2::default()
         .verify_password(password.as_bytes(), &parsed)
         .is_ok())
 }
 
 /// Create a JWT token for the given username, valid for 24 hours.
-pub fn generate_jwt(username: &str, secret: &[u8]) -> Result<String, AppError> {
+pub fn generate_jwt(username: &str, secret: &[u8]) -> Result<String, CoreError> {
     let now = chrono::Utc::now();
     let exp = (now + chrono::Duration::hours(24)).timestamp() as usize;
     let claims = Claims {
@@ -42,21 +42,21 @@ pub fn generate_jwt(username: &str, secret: &[u8]) -> Result<String, AppError> {
         &claims,
         &EncodingKey::from_secret(secret),
     )
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("JWT encoding failed: {}", e)))
+    .map_err(|e| CoreError::Internal(anyhow::anyhow!("JWT encoding failed: {}", e)))
 }
 
 /// Validate a JWT token and return the claims.
-pub fn validate_jwt(token: &str, secret: &[u8]) -> Result<Claims, AppError> {
+pub fn validate_jwt(token: &str, secret: &[u8]) -> Result<Claims, CoreError> {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
     jsonwebtoken::decode::<Claims>(token, &DecodingKey::from_secret(secret), &validation)
         .map(|data| data.claims)
-        .map_err(|e| AppError::Unauthorized(format!("Invalid token: {}", e)))
+        .map_err(|e| CoreError::Unauthorized(format!("Invalid token: {}", e)))
 }
 
 /// Retrieve the JWT secret from the `settings` table, or generate and persist
 /// a new random 32-byte secret on first run.
-pub async fn get_or_create_jwt_secret(pool: &SqlitePool) -> Result<Vec<u8>, AppError> {
+pub async fn get_or_create_jwt_secret(pool: &SqlitePool) -> Result<Vec<u8>, CoreError> {
     let row: Option<(String,)> =
         sqlx::query_as("SELECT value FROM settings WHERE key = 'jwt_secret'")
             .fetch_optional(pool)
@@ -65,7 +65,7 @@ pub async fn get_or_create_jwt_secret(pool: &SqlitePool) -> Result<Vec<u8>, AppE
     if let Some((hex_secret,)) = row {
         // Decode hex string back to bytes
         let bytes = hex::decode(&hex_secret)
-            .map_err(|e| AppError::Internal(anyhow::anyhow!("Invalid jwt_secret hex: {}", e)))?;
+            .map_err(|e| CoreError::Internal(anyhow::anyhow!("Invalid jwt_secret hex: {}", e)))?;
         return Ok(bytes);
     }
 
@@ -85,7 +85,7 @@ pub async fn get_or_create_jwt_secret(pool: &SqlitePool) -> Result<Vec<u8>, AppE
 
 /// Seed the default admin user if no users exist yet.
 /// Uses argon2-hashed "admin" as the default password.
-pub async fn seed_admin_user(pool: &SqlitePool) -> Result<(), AppError> {
+pub async fn seed_admin_user(pool: &SqlitePool) -> Result<(), CoreError> {
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
         .fetch_one(pool)
         .await?;
@@ -114,23 +114,23 @@ pub async fn change_password(
     username: &str,
     current_password: &str,
     new_password: &str,
-) -> Result<(), AppError> {
+) -> Result<(), CoreError> {
     let user: Option<(String,)> =
         sqlx::query_as("SELECT password_hash FROM users WHERE username = ?")
             .bind(username)
             .fetch_optional(pool)
             .await?;
 
-    let (current_hash,) = user.ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+    let (current_hash,) = user.ok_or_else(|| CoreError::NotFound("User not found".to_string()))?;
 
     if !verify_password(current_password, &current_hash)? {
-        return Err(AppError::Unauthorized(
+        return Err(CoreError::Unauthorized(
             "Current password is incorrect".to_string(),
         ));
     }
 
     if new_password.len() < 4 {
-        return Err(AppError::BadRequest(
+        return Err(CoreError::BadRequest(
             "New password must be at least 4 characters".to_string(),
         ));
     }

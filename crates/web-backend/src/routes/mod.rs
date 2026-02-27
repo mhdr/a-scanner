@@ -31,7 +31,7 @@ async fn require_auth(
 
     match token {
         Some(t) => {
-            match crate::services::auth_service::validate_jwt(t, &state.jwt_secret) {
+            match a_scanner_core::services::auth_service::validate_jwt(t, &state.jwt_secret) {
                 Ok(_claims) => next.run(req).await,
                 Err(_) => (
                     StatusCode::UNAUTHORIZED,

@@ -9,11 +9,11 @@ use axum::{
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{
+use a_scanner_core::models::{
     BulkToggleRequest, CreateProviderRequest, CreateRangeRequest, Provider, ProviderRange,
     ProviderSettings, UpdateProviderRequest, UpdateProviderSettingsRequest, UpdateRangeRequest,
 };
-use crate::services;
+use a_scanner_core::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

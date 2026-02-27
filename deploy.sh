@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # --- Configuration ---
-BINARY="backend/target/x86_64-unknown-linux-musl/release/a-scanner"
+BINARY="target/x86_64-unknown-linux-musl/release/a-scanner"
 DEPLOY_DIR="deploy"
 PREFIX="a-scanner"
 

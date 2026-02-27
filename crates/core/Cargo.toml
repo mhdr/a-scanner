@@ -1,23 +1,13 @@
 [package]
-name = "a-scanner"
-version = "0.1.0"
-edition = "2021"
+name = "a-scanner-core"
+version.workspace = true
+edition.workspace = true
 
 [lib]
-name = "a_scanner_backend"
+name = "a_scanner_core"
 path = "src/lib.rs"
 
-[[bin]]
-name = "a-scanner"
-path = "src/main.rs"
-
 [dependencies]
-# Web framework
-axum = { version = "0.8", features = ["macros", "ws"] }
-tokio = { version = "1", features = ["full"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "trace", "compression-br", "compression-gzip"] }
-
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono", "migrate"] }
 
@@ -31,11 +21,6 @@ anyhow = "1"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Embedded frontend assets
-rust-embed = { version = "8", features = ["mime-guess"] }
-mime_guess = "2"
 
 # Authentication
 argon2 = "0.5"
@@ -56,12 +41,5 @@ webpki-roots = "0.26"
 futures = "0.3"
 rlimit = "0.10"
 
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
-opt-level = "z"
-panic = "abort"
-
-[dev-dependencies]
-axum-test = "16"
+# Async runtime
+tokio = { version = "1", features = ["full"] }

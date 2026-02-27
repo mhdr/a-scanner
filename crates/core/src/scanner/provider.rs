@@ -4,7 +4,7 @@ use ipnet::IpNet;
 use sqlx::SqlitePool;
 
 use super::CdnProvider;
-use crate::error::AppError;
+use crate::error::CoreError;
 
 /// Fetch a URL and parse CIDR ranges from the response.
 ///
@@ -117,7 +117,7 @@ impl CdnProvider for DbProvider {
 pub async fn get_provider_from_db(
     db: &SqlitePool,
     id: &str,
-) -> Result<Box<dyn CdnProvider>, AppError> {
+) -> Result<Box<dyn CdnProvider>, CoreError> {
     let row = sqlx::query_as::<_, crate::models::Provider>(
         "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers WHERE id = ?",
@@ -125,7 +125,7 @@ pub async fn get_provider_from_db(
     .bind(id)
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("Provider '{id}' not found")))?;
+    .ok_or_else(|| CoreError::NotFound(format!("Provider '{id}' not found")))?;
 
     let urls: Vec<String> = serde_json::from_str(&row.ip_range_urls)
         .unwrap_or_default();

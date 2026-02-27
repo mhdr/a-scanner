@@ -1,11 +1,11 @@
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::error::CoreError;
 use crate::models::{CreateScanRequest, Scan, ScanResult, ScanStatus};
 
 /// Count total scans.
-pub async fn count_scans(db: &SqlitePool) -> Result<i64, AppError> {
+pub async fn count_scans(db: &SqlitePool) -> Result<i64, CoreError> {
     let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM scans")
         .fetch_one(db)
         .await?;
@@ -13,7 +13,7 @@ pub async fn count_scans(db: &SqlitePool) -> Result<i64, AppError> {
 }
 
 /// List scans with pagination.
-pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec<Scan>, AppError> {
+pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec<Scan>, CoreError> {
     let offset = ((page - 1) * per_page) as i64;
     let limit = per_page as i64;
 
@@ -33,7 +33,7 @@ pub async fn list_scans(db: &SqlitePool, page: u32, per_page: u32) -> Result<Vec
 }
 
 /// Create a new scan record and return it.
-pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Scan, AppError> {
+pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Scan, CoreError> {
     let id = Uuid::new_v4().to_string();
     let status = ScanStatus::Pending.as_str();
     let now = chrono::Utc::now().to_rfc3339();
@@ -64,7 +64,7 @@ pub async fn create_scan(db: &SqlitePool, req: &CreateScanRequest) -> Result<Sca
 }
 
 /// Get a single scan by ID.
-pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
+pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, CoreError> {
     let scan = sqlx::query_as::<_, Scan>(
         "SELECT id, provider, status, total_ips, scanned_ips, working_ips, created_at, updated_at,
                 mode, concurrency, timeout_ms, port, extended
@@ -73,13 +73,13 @@ pub async fn get_scan(db: &SqlitePool, id: &str) -> Result<Scan, AppError> {
     .bind(id)
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("Scan {id} not found")))?;
+    .ok_or_else(|| CoreError::NotFound(format!("Scan {id} not found")))?;
 
     Ok(scan)
 }
 
 /// Update the working_ips count for a scan.
-pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> Result<(), AppError> {
+pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> Result<(), CoreError> {
     sqlx::query("UPDATE scans SET working_ips = ?, updated_at = ? WHERE id = ?")
         .bind(count)
         .bind(chrono::Utc::now().to_rfc3339())
@@ -92,7 +92,7 @@ pub async fn update_working_ips(db: &SqlitePool, scan_id: &str, count: i64) -> R
 /// Delete all completed/failed scans and their results.
 /// Running and pending scans are left untouched.
 /// Returns the number of deleted scans (results are cascade-deleted).
-pub async fn delete_all_completed_scans(db: &SqlitePool) -> Result<u64, AppError> {
+pub async fn delete_all_completed_scans(db: &SqlitePool) -> Result<u64, CoreError> {
     let result = sqlx::query(
         "DELETE FROM scans WHERE status NOT IN ('running', 'pending')",
     )
@@ -102,7 +102,7 @@ pub async fn delete_all_completed_scans(db: &SqlitePool) -> Result<u64, AppError
 }
 
 /// Count results for a specific scan.
-pub async fn count_scan_results(db: &SqlitePool, scan_id: &str) -> Result<i64, AppError> {
+pub async fn count_scan_results(db: &SqlitePool, scan_id: &str) -> Result<i64, CoreError> {
     let row: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM scan_results WHERE scan_id = ? AND is_reachable = 1",
     )
@@ -118,7 +118,7 @@ pub async fn get_scan_results(
     scan_id: &str,
     page: u32,
     per_page: u32,
-) -> Result<Vec<ScanResult>, AppError> {
+) -> Result<Vec<ScanResult>, CoreError> {
     let offset = ((page - 1) * per_page) as i64;
     let limit = per_page as i64;
 

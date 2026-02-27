@@ -2,7 +2,7 @@ use ipnet::IpNet;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::error::CoreError;
 use crate::models::{
     BulkToggleRequest, CreateProviderRequest, CreateRangeRequest, Provider, ProviderRange,
     ProviderSettings, UpdateProviderRequest, UpdateProviderSettingsRequest, UpdateRangeRequest,
@@ -14,7 +14,7 @@ use crate::scanner::provider::{fetch_cidr_list, get_provider_from_db};
 // ---------------------------------------------------------------------------
 
 /// List all providers.
-pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, AppError> {
+pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, CoreError> {
     let providers = sqlx::query_as::<_, Provider>(
         "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers ORDER BY name",
@@ -25,7 +25,7 @@ pub async fn list_providers(db: &SqlitePool) -> Result<Vec<Provider>, AppError> 
 }
 
 /// Get a single provider by ID.
-pub async fn get_provider_by_id(db: &SqlitePool, id: &str) -> Result<Provider, AppError> {
+pub async fn get_provider_by_id(db: &SqlitePool, id: &str) -> Result<Provider, CoreError> {
     sqlx::query_as::<_, Provider>(
         "SELECT id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at
          FROM providers WHERE id = ?",
@@ -33,19 +33,19 @@ pub async fn get_provider_by_id(db: &SqlitePool, id: &str) -> Result<Provider, A
     .bind(id)
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("Provider '{id}' not found")))
+    .ok_or_else(|| CoreError::NotFound(format!("Provider '{id}' not found")))
 }
 
 /// Create a new custom provider.
 pub async fn create_provider(
     db: &SqlitePool,
     req: &CreateProviderRequest,
-) -> Result<Provider, AppError> {
+) -> Result<Provider, CoreError> {
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
     let description = req.description.clone().unwrap_or_default();
     let urls_json = serde_json::to_string(&req.ip_range_urls)
-        .map_err(|e| AppError::BadRequest(format!("Invalid ip_range_urls: {e}")))?;
+        .map_err(|e| CoreError::BadRequest(format!("Invalid ip_range_urls: {e}")))?;
 
     sqlx::query(
         "INSERT INTO providers (id, name, description, sni, ip_range_urls, is_builtin, response_format, created_at, updated_at)
@@ -78,7 +78,7 @@ pub async fn update_provider(
     db: &SqlitePool,
     id: &str,
     req: &UpdateProviderRequest,
-) -> Result<Provider, AppError> {
+) -> Result<Provider, CoreError> {
     let existing = get_provider_by_id(db, id).await?;
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -87,7 +87,7 @@ pub async fn update_provider(
     let sni = req.sni.as_deref().unwrap_or(&existing.sni);
     let urls_json = if let Some(ref urls) = req.ip_range_urls {
         serde_json::to_string(urls)
-            .map_err(|e| AppError::BadRequest(format!("Invalid ip_range_urls: {e}")))?            
+            .map_err(|e| CoreError::BadRequest(format!("Invalid ip_range_urls: {e}")))?
     } else {
         existing.ip_range_urls.clone()
     };
@@ -108,10 +108,10 @@ pub async fn update_provider(
 }
 
 /// Delete a provider and all associated ranges & settings.
-pub async fn delete_provider(db: &SqlitePool, id: &str) -> Result<(), AppError> {
+pub async fn delete_provider(db: &SqlitePool, id: &str) -> Result<(), CoreError> {
     let existing = get_provider_by_id(db, id).await?;
     if existing.is_builtin {
-        return Err(AppError::BadRequest(
+        return Err(CoreError::BadRequest(
             "Cannot delete a built-in provider".to_string(),
         ));
     }
@@ -136,7 +136,7 @@ pub async fn delete_provider(db: &SqlitePool, id: &str) -> Result<(), AppError> 
 // ---------------------------------------------------------------------------
 
 /// List all ranges for a provider.
-pub async fn get_ranges(db: &SqlitePool, provider_id: &str) -> Result<Vec<ProviderRange>, AppError> {
+pub async fn get_ranges(db: &SqlitePool, provider_id: &str) -> Result<Vec<ProviderRange>, CoreError> {
     let ranges = sqlx::query_as::<_, ProviderRange>(
         "SELECT id, provider_id, cidr, ip_count, enabled, is_custom, created_at, updated_at
          FROM provider_ranges WHERE provider_id = ? ORDER BY cidr",
@@ -148,7 +148,7 @@ pub async fn get_ranges(db: &SqlitePool, provider_id: &str) -> Result<Vec<Provid
 }
 
 /// List only enabled ranges for a provider (used by the scanner).
-pub async fn get_enabled_ranges(db: &SqlitePool, provider_id: &str) -> Result<Vec<ProviderRange>, AppError> {
+pub async fn get_enabled_ranges(db: &SqlitePool, provider_id: &str) -> Result<Vec<ProviderRange>, CoreError> {
     let ranges = sqlx::query_as::<_, ProviderRange>(
         "SELECT id, provider_id, cidr, ip_count, enabled, is_custom, created_at, updated_at
          FROM provider_ranges WHERE provider_id = ? AND enabled = 1 ORDER BY cidr",
@@ -191,7 +191,7 @@ fn cidr_ip_count(net: &IpNet) -> i64 {
 pub async fn fetch_and_store_ranges(
     db: &SqlitePool,
     provider_id: &str,
-) -> Result<Vec<ProviderRange>, AppError> {
+) -> Result<Vec<ProviderRange>, CoreError> {
     let provider = get_provider_from_db(db, provider_id).await?;
 
     let mut all_cidrs: Vec<(String, i64)> = Vec::new();
@@ -199,7 +199,7 @@ pub async fn fetch_and_store_ranges(
     for url in provider.ip_range_urls() {
         let nets = fetch_cidr_list(url, format)
             .await
-            .map_err(|e| AppError::Internal(e))?;
+            .map_err(|e| CoreError::Internal(e))?;
         for net in &nets {
             all_cidrs.push((net.to_string(), cidr_ip_count(net)));
         }
@@ -266,7 +266,7 @@ pub async fn create_custom_range(
     db: &SqlitePool,
     provider_id: &str,
     req: &CreateRangeRequest,
-) -> Result<ProviderRange, AppError> {
+) -> Result<ProviderRange, CoreError> {
     // Validate provider exists.
     let _ = get_provider_by_id(db, provider_id).await?;
 
@@ -274,7 +274,7 @@ pub async fn create_custom_range(
     let net: IpNet = req
         .cidr
         .parse()
-        .map_err(|e| AppError::BadRequest(format!("Invalid CIDR '{}': {e}", req.cidr)))?;
+        .map_err(|e| CoreError::BadRequest(format!("Invalid CIDR '{}': {e}", req.cidr)))?;
     let ip_count = cidr_ip_count(&net);
     let cidr_str = net.to_string();
 
@@ -297,16 +297,16 @@ pub async fn create_custom_range(
     .await
     .map_err(|e| match e {
         sqlx::Error::Database(ref db_err) if db_err.message().contains("UNIQUE") => {
-            AppError::BadRequest(format!("Range {cidr_str} already exists for provider {provider_id}"))
+            CoreError::BadRequest(format!("Range {cidr_str} already exists for provider {provider_id}"))
         }
-        other => AppError::Database(other),
+        other => CoreError::Database(other),
     })?;
 
     get_range_by_id(db, &id).await
 }
 
 /// Get a single range by its ID.
-async fn get_range_by_id(db: &SqlitePool, range_id: &str) -> Result<ProviderRange, AppError> {
+async fn get_range_by_id(db: &SqlitePool, range_id: &str) -> Result<ProviderRange, CoreError> {
     sqlx::query_as::<_, ProviderRange>(
         "SELECT id, provider_id, cidr, ip_count, enabled, is_custom, created_at, updated_at
          FROM provider_ranges WHERE id = ?",
@@ -314,7 +314,7 @@ async fn get_range_by_id(db: &SqlitePool, range_id: &str) -> Result<ProviderRang
     .bind(range_id)
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("Range {range_id} not found")))
+    .ok_or_else(|| CoreError::NotFound(format!("Range {range_id} not found")))
 }
 
 /// Update a range (CIDR and/or enabled flag).
@@ -322,14 +322,14 @@ pub async fn update_range(
     db: &SqlitePool,
     range_id: &str,
     req: &UpdateRangeRequest,
-) -> Result<ProviderRange, AppError> {
+) -> Result<ProviderRange, CoreError> {
     let existing = get_range_by_id(db, range_id).await?;
     let now = chrono::Utc::now().to_rfc3339();
 
     let (new_cidr, new_ip_count) = if let Some(ref cidr_str) = req.cidr {
         let net: IpNet = cidr_str
             .parse()
-            .map_err(|e| AppError::BadRequest(format!("Invalid CIDR '{cidr_str}': {e}")))?;
+            .map_err(|e| CoreError::BadRequest(format!("Invalid CIDR '{cidr_str}': {e}")))?;
         (net.to_string(), cidr_ip_count(&net))
     } else {
         (existing.cidr.clone(), existing.ip_count)
@@ -351,19 +351,19 @@ pub async fn update_range(
 }
 
 /// Delete a range.
-pub async fn delete_range(db: &SqlitePool, range_id: &str) -> Result<(), AppError> {
+pub async fn delete_range(db: &SqlitePool, range_id: &str) -> Result<(), CoreError> {
     let result = sqlx::query("DELETE FROM provider_ranges WHERE id = ?")
         .bind(range_id)
         .execute(db)
         .await?;
     if result.rows_affected() == 0 {
-        return Err(AppError::NotFound(format!("Range {range_id} not found")));
+        return Err(CoreError::NotFound(format!("Range {range_id} not found")));
     }
     Ok(())
 }
 
 /// Bulk toggle enabled/disabled for multiple range IDs.
-pub async fn bulk_toggle_ranges(db: &SqlitePool, req: &BulkToggleRequest) -> Result<(), AppError> {
+pub async fn bulk_toggle_ranges(db: &SqlitePool, req: &BulkToggleRequest) -> Result<(), CoreError> {
     let now = chrono::Utc::now().to_rfc3339();
     for id in &req.range_ids {
         sqlx::query("UPDATE provider_ranges SET enabled = ?, updated_at = ? WHERE id = ?")
@@ -381,7 +381,7 @@ pub async fn bulk_toggle_ranges(db: &SqlitePool, req: &BulkToggleRequest) -> Res
 // ---------------------------------------------------------------------------
 
 /// Get settings for a provider.
-pub async fn get_settings(db: &SqlitePool, provider_id: &str) -> Result<ProviderSettings, AppError> {
+pub async fn get_settings(db: &SqlitePool, provider_id: &str) -> Result<ProviderSettings, CoreError> {
     let settings = sqlx::query_as::<_, ProviderSettings>(
         "SELECT provider_id, auto_update, auto_update_interval_hours, last_fetched_at
          FROM provider_settings WHERE provider_id = ?",
@@ -389,7 +389,7 @@ pub async fn get_settings(db: &SqlitePool, provider_id: &str) -> Result<Provider
     .bind(provider_id)
     .fetch_optional(db)
     .await?
-    .ok_or_else(|| AppError::NotFound(format!("Settings for provider {provider_id} not found")))?;
+    .ok_or_else(|| CoreError::NotFound(format!("Settings for provider {provider_id} not found")))?;
     Ok(settings)
 }
 
@@ -398,7 +398,7 @@ pub async fn update_settings(
     db: &SqlitePool,
     provider_id: &str,
     req: &UpdateProviderSettingsRequest,
-) -> Result<ProviderSettings, AppError> {
+) -> Result<ProviderSettings, CoreError> {
     let existing = get_settings(db, provider_id).await?;
     let auto_update = req.auto_update.unwrap_or(existing.auto_update);
     let interval = req

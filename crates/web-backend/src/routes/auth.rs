@@ -10,8 +10,8 @@ use axum::{
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{AuthMeResponse, ChangePasswordRequest, Claims, LoginRequest, LoginResponse};
-use crate::services::auth_service;
+use a_scanner_core::models::{AuthMeResponse, ChangePasswordRequest, Claims, LoginRequest, LoginResponse};
+use a_scanner_core::services::auth_service;
 
 /// Build the auth router (mounted at /api/v1/auth).
 pub fn router() -> Router<Arc<AppState>> {
@@ -34,19 +34,19 @@ async fn login_handler(
             .await?;
 
     let (username, password_hash) =
-        user.ok_or_else(|| AppError::Unauthorized("Invalid username or password".to_string()))?;
+        user.ok_or_else(|| AppError::from(a_scanner_core::error::CoreError::Unauthorized("Invalid username or password".to_string())))?;
 
     // Verify password (CPU-intensive, run in blocking thread)
     let pw = body.password.clone();
     let hash = password_hash.clone();
     let valid = tokio::task::spawn_blocking(move || auth_service::verify_password(&pw, &hash))
         .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Join error: {}", e)))??;
+        .map_err(|e| AppError::from(anyhow::anyhow!("Join error: {}", e)))??;
 
     if !valid {
-        return Err(AppError::Unauthorized(
+        return Err(a_scanner_core::error::CoreError::Unauthorized(
             "Invalid username or password".to_string(),
-        ));
+        ).into());
     }
 
     let token = auth_service::generate_jwt(&username, &state.jwt_secret)?;
@@ -79,7 +79,7 @@ async fn change_password_handler(
         rt.block_on(auth_service::change_password(&pool, &username, &current, &new_pw))
     })
     .await
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("Join error: {}", e)))??;
+    .map_err(|e| AppError::from(anyhow::anyhow!("Join error: {}", e)))??;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -104,11 +104,11 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
             .headers
             .get("authorization")
             .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| AppError::Unauthorized("Missing authorization header".to_string()))?;
+            .ok_or_else(|| AppError::from(a_scanner_core::error::CoreError::Unauthorized("Missing authorization header".to_string())))?;
 
         let token = auth_header
             .strip_prefix("Bearer ")
-            .ok_or_else(|| AppError::Unauthorized("Invalid authorization header format".to_string()))?;
+            .ok_or_else(|| AppError::from(a_scanner_core::error::CoreError::Unauthorized("Invalid authorization header format".to_string())))?;
 
         let claims = auth_service::validate_jwt(token, &app_state.jwt_secret)?;
         Ok(AuthUser { claims })

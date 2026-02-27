@@ -13,7 +13,6 @@ use ipnet::IpNet;
 use super::provider::{expand_ranges, fetch_provider_ips, get_provider_from_db};
 use super::{probe_ip, quick_verify_ip, run_extended_tests, setup_fd_limit, ScanConfig};
 use crate::models::{ScanProgressEvent, ScanStatus};
-use crate::AppState;
 use crate::services;
 
 /// In-memory representation of a scan result row, accumulated during scanning
@@ -40,21 +39,22 @@ struct PendingResult {
 /// 2. Runs Phase 1 (TCP probe) on all IPs concurrently
 /// 3. If extended mode, runs Phase 2 (TLS/TTFB/speed) on reachable IPs
 /// 4. Writes all results to the database in bulk at the end
+///
+/// The caller is responsible for creating and cleaning up the broadcast channel.
 pub async fn run_scan(
     scan_id: String,
     config: ScanConfig,
-    state: Arc<AppState>,
+    pool: SqlitePool,
+    tls_connector: Arc<TlsConnector>,
+    tx: broadcast::Sender<ScanProgressEvent>,
 ) {
-    let tx = state.create_scan_channel(&scan_id).await;
-    let pool = &state.db;
-    let tls_connector = &state.tls_connector;
-    if let Err(e) = run_scan_inner(&scan_id, &config, pool, tls_connector, &tx).await {
+    if let Err(e) = run_scan_inner(&scan_id, &config, &pool, &tls_connector, &tx).await {
         tracing::error!("Scan {} failed: {}", scan_id, e);
-        let _ = update_scan_status(pool, &scan_id, ScanStatus::Failed).await;
+        let _ = update_scan_status(&pool, &scan_id, ScanStatus::Failed).await;
         // Fetch the latest scan data from DB so we preserve the real progress counts
         // rather than resetting them to 0.
         let (scanned, working, total) =
-            match services::scan_service::get_scan(pool, &scan_id).await {
+            match services::scan_service::get_scan(&pool, &scan_id).await {
                 Ok(s) => (s.scanned_ips, s.working_ips, s.total_ips),
                 Err(_) => (0, 0, 0),
             };
@@ -69,7 +69,6 @@ pub async fn run_scan(
             extended_total: None,
         });
     }
-    state.remove_scan_channel(&scan_id).await;
 }
 
 /// Emit a progress event, ignoring send errors (no subscribers).

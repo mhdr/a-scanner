@@ -11,8 +11,8 @@ use axum::{
 use serde::Deserialize;
 
 use crate::AppState;
-use crate::models::ScanStatus;
-use crate::services;
+use a_scanner_core::models::ScanStatus;
+use a_scanner_core::services;
 
 /// Query parameters for WebSocket auth.
 #[derive(Debug, Deserialize)]
@@ -72,7 +72,7 @@ async fn scan_ws_handler(
 
         // If scan is already finished, send final state and close
         if status == ScanStatus::Completed || status == ScanStatus::Failed {
-            let event = crate::models::ScanProgressEvent {
+            let event = a_scanner_core::models::ScanProgressEvent {
                 scan_id: scan.id.clone(),
                 status: scan.status.clone(),
                 scanned_ips: scan.scanned_ips,
@@ -95,7 +95,7 @@ async fn scan_ws_handler(
             None => {
                 // No channel yet (scan might still be in pending state).
                 // Send current DB state and close — client will reconnect or poll.
-                let event = crate::models::ScanProgressEvent {
+                let event = a_scanner_core::models::ScanProgressEvent {
                     scan_id: scan.id.clone(),
                     status: scan.status.clone(),
                     scanned_ips: scan.scanned_ips,

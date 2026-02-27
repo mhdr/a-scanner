@@ -1,6 +1,6 @@
 use sqlx::SqlitePool;
 
-use crate::error::AppError;
+use crate::error::CoreError;
 use crate::models::{AggregatedIpResult, ScanResult};
 
 /// List all scan results with optional filtering.
@@ -10,7 +10,7 @@ pub async fn list_results(
     per_page: u32,
     reachable_only: Option<bool>,
     provider: Option<&str>,
-) -> Result<Vec<ScanResult>, AppError> {
+) -> Result<Vec<ScanResult>, CoreError> {
     let offset = ((page - 1) * per_page) as i64;
     let limit = per_page as i64;
     let reachable = reachable_only.unwrap_or(false);
@@ -86,7 +86,7 @@ pub async fn count_results(
     db: &SqlitePool,
     reachable_only: Option<bool>,
     provider: Option<&str>,
-) -> Result<i64, AppError> {
+) -> Result<i64, CoreError> {
     let reachable = reachable_only.unwrap_or(false);
 
     let count: (i64,) = if let Some(prov) = provider {
@@ -124,7 +124,7 @@ pub async fn list_aggregated_ips(
     page: u32,
     per_page: u32,
     provider: Option<&str>,
-) -> Result<Vec<AggregatedIpResult>, AppError> {
+) -> Result<Vec<AggregatedIpResult>, CoreError> {
     let offset = ((page - 1) * per_page) as i64;
     let limit = per_page as i64;
 
@@ -183,7 +183,7 @@ pub async fn list_aggregated_ips(
 pub async fn count_aggregated_ips(
     db: &SqlitePool,
     provider: Option<&str>,
-) -> Result<i64, AppError> {
+) -> Result<i64, CoreError> {
     let count: (i64,) = if let Some(prov) = provider {
         sqlx::query_as(
             "SELECT COUNT(DISTINCT sr.ip) FROM scan_results sr JOIN scans s ON sr.scan_id = s.id WHERE sr.is_reachable = 1 AND s.provider = ?",
@@ -200,13 +200,13 @@ pub async fn count_aggregated_ips(
     Ok(count.0)
 }
 
-/// List all individual scan results for a specific IP address.
+/// List all individual scan results for a specific IP.
 pub async fn list_ip_results(
     db: &SqlitePool,
     ip: &str,
     page: u32,
     per_page: u32,
-) -> Result<Vec<ScanResult>, AppError> {
+) -> Result<Vec<ScanResult>, CoreError> {
     let offset = ((page - 1) * per_page) as i64;
     let limit = per_page as i64;
 
@@ -228,17 +228,13 @@ pub async fn list_ip_results(
     Ok(results)
 }
 
-/// Count all scan results for a specific IP address.
-pub async fn count_ip_results(
-    db: &SqlitePool,
-    ip: &str,
-) -> Result<i64, AppError> {
-    let count: (i64,) = sqlx::query_as(
+/// Count all results for a specific IP.
+pub async fn count_ip_results(db: &SqlitePool, ip: &str) -> Result<i64, CoreError> {
+    let row: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM scan_results WHERE ip = ?",
     )
     .bind(ip)
     .fetch_one(db)
     .await?;
-
-    Ok(count.0)
+    Ok(row.0)
 }

@@ -10,10 +10,10 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{CreateScanRequest, PaginatedResponse, Scan, ScanResult};
-use crate::scanner::ScanConfig;
-use crate::scanner::orchestrator::run_scan;
-use crate::services;
+use a_scanner_core::models::{CreateScanRequest, PaginatedResponse, Scan, ScanResult};
+use a_scanner_core::scanner::ScanConfig;
+use a_scanner_core::scanner::orchestrator::run_scan;
+use a_scanner_core::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
@@ -66,12 +66,17 @@ async fn create_scan(
         ip_ranges: body.ip_ranges.clone(),
     };
 
-    // Spawn scan as background task
+    // Create broadcast channel for this scan's progress events
     let scan_id = scan.id.clone();
+    let tx = state.create_scan_channel(&scan_id).await;
+    let pool = state.db.clone();
+    let tls = state.tls_connector.clone();
     let state_clone = state.clone();
 
     tokio::spawn(async move {
-        run_scan(scan_id, config, state_clone).await;
+        run_scan(scan_id.clone(), config, pool, tls, tx).await;
+        // Clean up the channel after scan completes
+        state_clone.remove_scan_channel(&scan_id).await;
     });
 
     Ok((axum::http::StatusCode::CREATED, Json(scan)))

@@ -3,23 +3,19 @@
 version = 4
 
 [[package]]
-name = "a-scanner"
+name = "a-scanner-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "argon2",
- "axum 0.8.8",
- "axum-test",
  "chrono",
  "futures",
  "hex",
  "ipnet",
  "jsonwebtoken",
- "mime_guess",
  "rand 0.8.5",
  "reqwest",
  "rlimit",
- "rust-embed",
  "rustls",
  "serde",
  "serde_json",
@@ -27,12 +23,31 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-rustls",
+ "tracing",
+ "uuid",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "a-scanner-web"
+version = "0.1.0"
+dependencies = [
+ "a-scanner-core",
+ "anyhow",
+ "axum 0.8.8",
+ "axum-test",
+ "mime_guess",
+ "rust-embed",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tokio-rustls",
  "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]

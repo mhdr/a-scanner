@@ -11,8 +11,8 @@ use serde::Deserialize;
 
 use crate::AppState;
 use crate::error::AppError;
-use crate::models::{AggregatedIpResult, PaginatedResponse, ScanResult};
-use crate::services;
+use a_scanner_core::models::{AggregatedIpResult, PaginatedResponse, ScanResult};
+use a_scanner_core::services;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()

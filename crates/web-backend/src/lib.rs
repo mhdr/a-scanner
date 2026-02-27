@@ -1,9 +1,5 @@
-pub mod db;
 pub mod error;
-pub mod models;
 pub mod routes;
-pub mod scanner;
-pub mod services;
 
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -11,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 use tokio_rustls::TlsConnector;
 
-use crate::models::ScanProgressEvent;
+use a_scanner_core::models::ScanProgressEvent;
 
 /// Shared application state passed to all route handlers.
 #[derive(Clone)]
@@ -34,7 +30,6 @@ impl AppState {
         })
     }
 
-    /// Create a broadcast channel for a scan and return the sender.
     pub async fn create_scan_channel(&self, scan_id: &str) -> broadcast::Sender<ScanProgressEvent> {
         let (tx, _) = broadcast::channel(256);
         self.scan_channels
@@ -44,7 +39,6 @@ impl AppState {
         tx
     }
 
-    /// Subscribe to progress updates for a scan.
     pub async fn subscribe_scan(&self, scan_id: &str) -> Option<broadcast::Receiver<ScanProgressEvent>> {
         self.scan_channels
             .lock()
@@ -53,7 +47,6 @@ impl AppState {
             .map(|tx| tx.subscribe())
     }
 
-    /// Remove the broadcast channel for a completed/failed scan.
     pub async fn remove_scan_channel(&self, scan_id: &str) {
         self.scan_channels.lock().await.remove(scan_id);
     }
