@@ -83,10 +83,10 @@ jobs:
 
       # ── Build Rust .so (both ABIs) ────────────────────────────────────
       - name: Build mobile-backend for arm64-v8a
-        run: cargo build --target aarch64-linux-android -p mobile-backend --release
+        run: cargo build --target aarch64-linux-android -p a-scanner-mobile --release
 
       - name: Build mobile-backend for armeabi-v7a
-        run: cargo build --target armv7-linux-androideabi -p mobile-backend --release
+        run: cargo build --target armv7-linux-androideabi -p a-scanner-mobile --release
 
       - name: Copy libmobile_backend.so to jniLibs
         run: |
