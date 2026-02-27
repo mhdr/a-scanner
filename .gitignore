@@ -12,6 +12,13 @@
 /frontend/dist/
 /frontend/.vite/
 
+# Node / Mobile
+/mobile/node_modules/
+
+# Mobile build artifacts (built by build-mobile.sh, not committed)
+/mobile/android/app/src/main/jniLibs/arm64-v8a/libmobile_backend.so
+/mobile/android/app/build/
+
 # Environment
 .env
 .env.*

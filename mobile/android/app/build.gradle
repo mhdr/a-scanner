@@ -92,15 +92,32 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            def ksFile   = System.getenv("ASCANNER_RELEASE_STORE_FILE")   ?: project.findProperty("ASCANNER_RELEASE_STORE_FILE")   ?: "release.keystore"
+            def ksPwd    = System.getenv("ASCANNER_RELEASE_STORE_PASSWORD") ?: project.findProperty("ASCANNER_RELEASE_STORE_PASSWORD") ?: ""
+            def ksAlias  = System.getenv("ASCANNER_RELEASE_KEY_ALIAS")    ?: project.findProperty("ASCANNER_RELEASE_KEY_ALIAS")    ?: "ascanner"
+            def ksKeyPwd = System.getenv("ASCANNER_RELEASE_KEY_PASSWORD") ?: project.findProperty("ASCANNER_RELEASE_KEY_PASSWORD") ?: ""
+
+            if (file(ksFile).exists() && ksPwd != "") {
+                storeFile file(ksFile)
+                storePassword ksPwd
+                keyAlias ksAlias
+                keyPassword ksKeyPwd
+            } else {
+                // Fall back to debug signing when release keystore is not configured
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

@@ -1,0 +1,107 @@
+name: Build Web
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'crates/core/**'
+      - 'crates/web-backend/**'
+      - 'frontend/**'
+      - 'migrations/**'
+      - '.github/workflows/build-web.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'crates/core/**'
+      - 'crates/web-backend/**'
+      - 'frontend/**'
+      - 'migrations/**'
+      - '.github/workflows/build-web.yml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-web:
+    name: Build web binary (x86_64 musl)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node.js ──────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Rust ─────────────────────────────────────────────────────────
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-web-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-web-
+
+      # ── Build frontend ───────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ── Build backend ────────────────────────────────────────────────
+      - name: Build web-backend (release, static musl)
+        run: cargo build -p a-scanner-web --release --target x86_64-unknown-linux-musl
+
+      # ── Upload artifact ──────────────────────────────────────────────
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: a-scanner-web-${{ github.sha }}
+          path: target/x86_64-unknown-linux-musl/release/a-scanner
+          if-no-files-found: error
+
+  test:
+    name: Run Rust tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: rust-test-
+
+      - name: Run tests
+        run: cargo test --workspace --exclude a-scanner-mobile
