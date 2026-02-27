@@ -2,87 +2,158 @@
 
 ## Project Overview
 
-α-scanner is a Rust-based web application for scanning Cloudflare and other CDN IP addresses to find ones that are not filtered by firewalls such as Iran's Great Firewall (GFW). It provides a web UI for initiating scans, viewing results, and managing IP ranges.
+α-scanner is a Rust-based application for scanning Cloudflare and other CDN IP addresses to find ones that are not filtered by firewalls such as Iran's Great Firewall (GFW). It provides both a **web UI** (React + MUI) and a **native Android app** (React Native) for initiating scans, viewing results, and managing IP ranges. The Android app runs scans **on-device** via JNI (no HTTP server needed) and requires **root access** for elevated network operations.
 
 ## Tech Stack
 
-| Layer    | Technology                        |
-|----------|-----------------------------------|
-| Backend  | Rust, Axum                        |
-| Frontend | React, TypeScript, MUI, Zustand   |
-| Database | SQLite (via sqlx with compile-time checked queries) |
-| Build    | Cargo (backend), Vite (frontend)  |
+| Layer            | Technology                                             |
+|------------------|--------------------------------------------------------|
+| Core Library     | Rust (shared scanner, services, models, DB logic)      |
+| Web Backend      | Rust, Axum (thin HTTP layer over core)                 |
+| Mobile Backend   | Rust, JNI (thin JNI bridge over core for Android)      |
+| Web Frontend     | React, TypeScript, MUI, Zustand                        |
+| Mobile App       | React Native (bare workflow), TypeScript, React Native Paper, Zustand |
+| Database         | SQLite (via sqlx with compile-time checked queries)    |
+| Build            | Cargo workspace (Rust), Vite (web frontend), React Native CLI (mobile) |
+
+## Architecture Overview
+
+The Rust backend is split into a **Cargo workspace** with three crates:
+
+- **`core`** — library crate containing all shared business logic: scanner, services, models, database, error types, and a facade API. Has **no dependency** on Axum, HTTP, or JNI.
+- **`web-backend`** — binary crate that wraps `core` with Axum HTTP routes, WebSocket support, and embedded static frontend files. Depends on `core`.
+- **`mobile-backend`** — `cdylib` crate that wraps `core` with JNI bridge functions for Android. Depends on `core`. Produces `libmobile_backend.so`.
+
+This separation ensures the scanning engine and business logic are reusable across both web and mobile without duplication.
 
 ## Project Structure
 
 ```
 a-scanner/
+├── Cargo.toml                        # [workspace] root — members: crates/*
 ├── .github/
 │   └── copilot-instructions.md
-├── run-backend.sh               # Dev script: start backend
-├── run-frontend.sh              # Dev script: start frontend
-├── build.sh                     # Build single deployable executable
-├── backend/
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── main.rs              # Entry point, Axum server setup
-│   │   ├── lib.rs               # Re-exports, app state
-│   │   ├── routes/              # Axum route handlers (one file per resource)
-│   │   │   └── static_files.rs  # Serves embedded frontend assets
-│   │   ├── models/              # Database models & domain types
-│   │   ├── db/                  # Database migrations, queries, connection pool
-│   │   ├── scanner/             # Core scanning logic (IP probing, concurrency)
-│   │   ├── services/            # Business logic layer between routes and db
-│   │   └── error.rs             # Unified error types implementing IntoResponse
-│   └── migrations/              # SQLite migrations (sqlx)
-├── frontend/
+├── run-backend.sh                    # Dev script: start web backend
+├── run-frontend.sh                   # Dev script: start web frontend (Vite)
+├── build-web.sh                      # Build web deployable (frontend + web-backend)
+├── build-mobile.sh                   # Build Android APK (mobile-backend .so + RN app)
+├── migrations/                       # SQLite migrations (shared, at workspace root)
+│   ├── 20260226000000_initial.sql
+│   ├── ...
+│
+├── crates/
+│   ├── core/
+│   │   ├── Cargo.toml               # Lib crate: sqlx, serde, tokio, tracing, etc.
+│   │   └── src/
+│   │       ├── lib.rs               # Re-exports all modules
+│   │       ├── error.rs             # Unified error types (thiserror)
+│   │       ├── db/mod.rs            # Database pool, queries, migrations
+│   │       ├── models/mod.rs        # Domain types (Scan, ScanResult, Provider, etc.)
+│   │       ├── scanner/             # IP scanning/probing engine
+│   │       │   ├── mod.rs
+│   │       │   ├── orchestrator.rs
+│   │       │   └── provider.rs
+│   │       ├── services/            # Business logic layer
+│   │       │   ├── mod.rs
+│   │       │   ├── auth_service.rs
+│   │       │   ├── provider_service.rs
+│   │       │   ├── scan_service.rs
+│   │       │   └── result_service.rs
+│   │       └── facade.rs            # High-level async API (no HTTP/JNI types)
+│   │
+│   ├── web-backend/
+│   │   ├── Cargo.toml               # Bin crate: core (path dep), axum, tower-http, rust-embed
+│   │   └── src/
+│   │       ├── main.rs              # Axum server entry point
+│   │       ├── lib.rs               # AppState (wraps core::CoreState + web concerns)
+│   │       └── routes/              # HTTP route handlers
+│   │           ├── mod.rs
+│   │           ├── auth.rs
+│   │           ├── providers.rs
+│   │           ├── results.rs
+│   │           ├── scans.rs
+│   │           ├── ws.rs
+│   │           └── static_files.rs
+│   │
+│   └── mobile-backend/
+│       ├── Cargo.toml               # cdylib crate: core (path dep), jni, once_cell, tokio, serde_json
+│       └── src/
+│           └── lib.rs               # JNI bridge functions (Java_com_ascanner_bridge_*)
+│
+├── frontend/                         # React web frontend (unchanged)
 │   ├── package.json
 │   ├── vite.config.ts
-│   ├── tsconfig.json
-│   ├── index.html
 │   └── src/
-│       ├── main.tsx             # React entry point
-│       ├── App.tsx              # Root component, router setup
-│       ├── api/                 # API client functions (fetch wrappers)
-│       ├── components/          # Reusable MUI-based UI components
-│       ├── pages/               # Page-level components (one per route)
-│       ├── stores/              # Zustand stores (one file per domain)
-│       ├── types/               # TypeScript type definitions
-│       └── theme.ts             # MUI theme customization
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── api/                     # HTTP fetch wrappers → /api/v1/*
+│       ├── components/
+│       ├── pages/
+│       ├── stores/                  # Zustand stores (HTTP-based)
+│       ├── types/
+│       └── theme.ts
+│
+├── mobile/                           # React Native Android app
+│   ├── package.json
+│   ├── android/
+│   │   └── app/src/main/
+│   │       ├── java/com/ascanner/
+│   │       │   ├── bridge/
+│   │       │   │   └── ScannerBridge.kt     # JNI external declarations
+│   │       │   └── modules/
+│   │       │       ├── ScannerModule.kt     # React Native Native Module
+│   │       │       └── ScannerPackage.kt    # Module registration
+│   │       └── jniLibs/
+│   │           └── arm64-v8a/
+│   │               └── libmobile_backend.so # Built from mobile-backend crate
+│   └── src/
+│       ├── App.tsx
+│       ├── native/
+│       │   └── ScannerBridge.ts     # Typed wrapper around NativeModules.ScannerModule
+│       ├── components/
+│       ├── hooks/
+│       ├── screens/                 # LoginScreen, ScansScreen, ScanDetailScreen, etc.
+│       ├── stores/                  # Zustand stores (JNI-based, adapted from frontend)
+│       └── types/                   # Reused from frontend/src/types/
+│
 └── README.md
 ```
 
-## Backend Guidelines
+## Core Crate Guidelines
 
-### Axum Patterns
+The `core` crate is the **single source of truth** for all business logic, shared by both web and mobile backends.
 
-- Use `axum::Router` to define routes. Group routes by resource under `routes/`.
-- Use `axum::extract::State` to share application state (DB pool, config).
-- Define a shared `AppState` struct holding the SQLite connection pool and any shared configuration.
-- Use extractors (`Json`, `Path`, `Query`) for request parsing.
-- Return `impl IntoResponse` or `Result<Json<T>, AppError>` from handlers.
-- Use `tower_http` middleware for CORS, logging, and serving the frontend static files.
+### Facade API (`core::facade`)
+
+- Expose a high-level async API that does NOT depend on Axum, HTTP, WebSocket, or JNI types.
+- All facade functions accept `&CoreState` and return `Result<T>`.
+- `CoreState` struct holds: `SqlitePool`, `Arc<TlsConnector>`, JWT secret, and any shared config.
+- `init(db_path: &str) -> Result<CoreState>` — creates DB pool, runs migrations, sets up TLS.
+- Scan progress is delivered via `tokio::sync::broadcast` channels (not WebSocket — that's a web concern).
+- The web-backend wraps `CoreState` in its own `AppState` and bridges broadcast channels to WebSocket.
+- The mobile-backend stores `CoreState` in a `OnceCell<CoreState>` and polls broadcast channels via JNI.
 
 ### Database (SQLite + sqlx)
 
 - Use `sqlx::SqlitePool` for async connection pooling.
-- Place SQL migrations in `backend/migrations/` using sqlx-cli conventions.
+- SQL migrations live at the **workspace root** in `migrations/` (shared by web and mobile).
 - Prefer `sqlx::query_as!` for compile-time checked queries when practical.
 - Use `sqlx::FromRow` derive on model structs.
 - Always use parameterized queries — never interpolate user input into SQL.
 
 ### Error Handling
 
-- Define a unified `AppError` enum in `error.rs` that implements `IntoResponse`.
-- Map domain errors, database errors, and validation errors into appropriate HTTP status codes.
-- Use `thiserror` for ergonomic error definitions.
-- Return structured JSON error responses: `{ "error": "message" }`.
+- Define a unified `CoreError` enum in `core::error` using `thiserror`.
+- `CoreError` must NOT implement `IntoResponse` (that's a web-backend concern).
+- The web-backend maps `CoreError` into its own `AppError` that implements `IntoResponse`.
+- The mobile-backend maps `CoreError` into JSON error strings for JNI.
+- Return structured error info: `{ "error": "message" }`.
 
 ### Scanner Module
 
 - The scanner module contains the core IP scanning/probing logic.
 - Use `tokio` for async concurrency when probing IPs.
-- Support configurable concurrency limits, timeouts, and retry policies.
+- Support **configurable** concurrency limits, timeouts, and retry policies (mobile may use lower concurrency for battery conservation).
 - CDN providers (Cloudflare, etc.) should be abstracted behind a trait so new providers can be added.
 - Store scan results (IP, latency, status, provider, timestamp) in the database.
 
@@ -93,8 +164,54 @@ a-scanner/
 - Use `tracing` (not `log`) for structured logging.
 - Format code with `rustfmt`; lint with `clippy`.
 - Write doc comments (`///`) on public items.
+- Keep `core` free of any platform-specific (web/mobile) dependencies.
 
-## Frontend Guidelines
+## Web Backend Guidelines
+
+The `web-backend` crate is a thin Axum wrapper over `core`. It adds HTTP routing, WebSocket support, CORS, and embedded static frontend files.
+
+### Axum Patterns
+
+- Use `axum::Router` to define routes. Group routes by resource under `routes/`.
+- Use `axum::extract::State` to share `AppState` (wraps `core::CoreState` + web-specific fields like scan channel maps).
+- Use extractors (`Json`, `Path`, `Query`) for request parsing.
+- Return `impl IntoResponse` or `Result<Json<T>, AppError>` from handlers.
+- Use `tower_http` middleware for CORS, logging, and serving the frontend static files.
+- Route handlers should delegate to `core` facade/services — keep handlers thin.
+
+## Mobile Backend Guidelines
+
+The `mobile-backend` crate is a `cdylib` that exposes `core` functionality to Android via JNI.
+
+### JNI Bridge Patterns
+
+- Use the `jni` crate (0.21+) for JNI interop.
+- Crate type must be `["cdylib"]` to produce `libmobile_backend.so`.
+- Use `once_cell::sync::OnceCell` to store a persistent `tokio::Runtime` and `CoreState` for the app's lifetime.
+- Each JNI function blocks on the tokio runtime (`runtime.block_on(...)`) to call async core functions.
+- Pass complex types as **JSON strings** (`JString`) for simplicity — serialize with `serde_json`.
+- JNI function naming follows the convention: `Java_com_ascanner_bridge_ScannerBridge_<methodName>`.
+- **Never panic** across the JNI boundary — catch all errors and return JSON `{ "error": "message" }`.
+- For scan progress, use a poll-based model: `startScan` stores a `broadcast::Receiver` in a `HashMap`, and `pollScanProgress` drains available events.
+
+### Root Access
+
+- The Android device has **root access** (`su` available).
+- Use `std::process::Command` to run `su -c <command>` for privileged operations.
+- On init, raise file descriptor limits via `su -c ulimit -n 65536` for high-concurrency scanning.
+- `checkRootAccess()` runs `su -c id` and returns `true` if exit code is 0.
+- Show a warning in the mobile app if root is unavailable.
+- Consider granting `NET_RAW` capability via root for future raw socket needs.
+
+### Cross-Compilation
+
+- Target: `aarch64-linux-android` (ARM64 Android devices).
+- Requires Android NDK with the appropriate clang linker configured in `.cargo/config.toml`.
+- SQLite: use sqlx with the `bundled` SQLite feature for Android (no system SQLite dependency).
+- Build command: `cargo build --target aarch64-linux-android -p mobile-backend --release`
+- Output: `target/aarch64-linux-android/release/libmobile_backend.so`
+
+## Web Frontend Guidelines
 
 ### Responsive Design (Desktop & Mobile)
 
@@ -125,7 +242,7 @@ a-scanner/
 - Prefer MUI's `<Box>`, `<Stack>`, and `<Grid>` for layout.
 - Use `<DataGrid>` for tabular scan results with sorting, filtering, and pagination.
 
-### Zustand
+### Zustand (Web)
 
 - Create one store per domain (e.g., `scanStore`, `settingsStore`, `resultStore`).
 - Keep stores flat — avoid deeply nested state.
@@ -145,7 +262,7 @@ interface ScanState {
 }
 ```
 
-### API Client
+### API Client (Web)
 
 - Place all API call functions in `api/` directory.
 - Use `fetch` (or a thin wrapper) — avoid heavy HTTP client libraries.
@@ -153,7 +270,52 @@ interface ScanState {
 - All API functions should be typed: accept typed params, return typed responses.
 - Handle errors consistently — throw on non-OK responses.
 
-## API Design
+## Mobile App Guidelines
+
+The mobile app is a **React Native bare workflow** (not Expo) Android-only application. It communicates with the Rust `core` library directly via JNI — **no HTTP server** runs on-device.
+
+### Architecture
+
+- **Kotlin JNI Bridge** (`ScannerBridge.kt`): loads `libmobile_backend.so`, declares `external` JNI functions.
+- **React Native Native Module** (`ScannerModule.kt`): wraps `ScannerBridge` calls with `@ReactMethod` annotations, returns results via `Promise`, runs JNI calls on background threads.
+- **TypeScript Bridge** (`src/native/ScannerBridge.ts`): typed wrapper around `NativeModules.ScannerModule` — JSON.parse/stringify at the boundary.
+- **Zustand Stores**: adapted from `frontend/src/stores/` but call `ScannerBridge.*` instead of HTTP `fetch`.
+- **Types**: reused from `frontend/src/types/` (same domain model).
+
+### React Native + TypeScript
+
+- Use functional components with hooks exclusively.
+- Use TypeScript strict mode.
+- Navigation: `@react-navigation/native` with stack + drawer navigators.
+- Keep screens focused. Extract reusable logic into custom hooks.
+
+### UI Library (React Native Paper)
+
+- Use [React Native Paper](https://callstack.github.io/react-native-paper/) as the component library (Material Design).
+- Dark theme matching the web app's color scheme.
+- Screens: LoginScreen, ScansScreen, ScanDetailScreen, ProvidersScreen, ResultsScreen.
+- Ensure touch-friendly tap targets and proper spacing for mobile UX.
+
+### Zustand (Mobile)
+
+- Same patterns as web: one store per domain, flat state, actions co-located.
+- Key difference: store actions call `ScannerBridge.*` (JNI) instead of `fetch('/api/v1/...')`.
+- For scan progress, poll `ScannerBridge.pollScanProgress(scanId)` every 500ms while a scan is running (no WebSocket needed since everything is in-process).
+
+### Scan Progress (Mobile)
+
+- No WebSocket on mobile — use a **polling model**.
+- `startScan()` returns a scan ID. The store sets up a `setInterval` polling loop calling `pollScanProgress(scanId)` every 500ms.
+- Progress events are the same shape as the web WebSocket events, just delivered via polling.
+- Stop polling when the scan completes or fails.
+
+## Shared Types
+
+- `frontend/src/types/` and `mobile/src/types/` share the **same TypeScript type definitions** (Scan, ScanResult, Provider, ScanConfig, etc.).
+- When changing domain types in `core::models`, update the TypeScript types in both frontends.
+- Consider a shared types package or simple file copy to keep them in sync.
+
+## API Design (Web)
 
 - Use RESTful JSON API conventions.
 - Prefix all backend API routes with `/api/v1/`.
@@ -173,50 +335,57 @@ Key endpoints:
 
 ## Testing
 
-### Backend
+### Core Crate
 - Use `#[tokio::test]` for async tests.
 - Use an in-memory SQLite database for tests.
-- Test route handlers using `axum::test::TestClient` (from `axum-test` crate).
 - Place unit tests in `#[cfg(test)] mod tests` within each module.
-- Place integration tests in `backend/tests/`.
+- Test facade functions and services independently.
 
-### Frontend
+### Web Backend
+- Test route handlers using `axum::test::TestClient` (from `axum-test` crate).
+- Place integration tests in `crates/web-backend/tests/`.
+
+### Mobile Backend
+- Test JNI functions using standard Rust tests (call the underlying async functions, not JNI directly).
+- Integration testing requires an Android emulator or device.
+
+### Web Frontend
 - Use Vitest as the test runner.
 - Use React Testing Library for component tests.
 - Mock API calls in tests — don't hit real endpoints.
 - Test Zustand stores independently by calling actions and asserting state.
 
+### Mobile App
+- Use Jest as the test runner (React Native default).
+- Mock `NativeModules.ScannerModule` in tests.
+- Test Zustand stores independently with mocked JNI bridge.
+
 ## Development Workflow
 
-- Run backend: `./run-backend.sh` (or `cd backend && cargo run`)
-- Run frontend: `./run-frontend.sh` (or `cd frontend && npm run dev`)
-- Run all backend tests: `cd backend && cargo test`
-- Run all frontend tests: `cd frontend && npm test`
-- The backend serves the frontend's built static files in production.
-- In development, use Vite's proxy to forward `/api` requests to the backend.
+- Run web backend: `./run-backend.sh` (or `cd crates/web-backend && cargo run`)
+- Run web frontend: `./run-frontend.sh` (or `cd frontend && npm run dev`)
+- Run all Rust tests: `cargo test` (from workspace root — tests core + web-backend)
+- Run web frontend tests: `cd frontend && npm test`
+- Run mobile app: `cd mobile && npx react-native run-android`
+- The web backend serves the frontend's built static files in production.
+- In development, use Vite's proxy to forward `/api` requests to the web backend.
 
 ### Dev Scripts
 
-The project root contains convenience scripts for development:
-
-- `run-backend.sh` — starts the Rust backend via `cargo run`
+- `run-backend.sh` — starts the web backend via `cargo run -p web-backend`
 - `run-frontend.sh` — installs npm dependencies if needed, then starts the Vite dev server
 
 ## Deployment
 
-The project produces a **single self-contained executable**. The React frontend is compiled to static files and embedded into the Rust binary at build time using [`rust-embed`](https://crates.io/crates/rust-embed). This means no separate web server or static file directory is needed in production.
+### Web (Single Executable)
 
-### How it works
+The web deployment produces a **single self-contained executable**. The React frontend is compiled to static files and embedded into the Rust binary at build time using [`rust-embed`](https://crates.io/crates/rust-embed).
 
 1. The frontend is built with `npm run build`, producing `frontend/dist/`.
-2. The backend compiles with `cargo build --release`. The `rust-embed` crate embeds all files from `frontend/dist/` into the binary.
+2. The web-backend compiles with `cargo build -p web-backend --release`. `rust-embed` embeds `frontend/dist/` into the binary.
 3. At runtime, the server serves API routes under `/api/v1/` and falls back to the embedded frontend assets for all other paths (SPA routing via `index.html` fallback).
 
-### Build script
-
-- `build.sh` — builds the frontend, then compiles the backend in release mode, producing `backend/target/release/a-scanner`.
-
-The resulting binary can be copied to any compatible machine and run directly:
+Build script: `build-web.sh`
 
 ```bash
 ./a-scanner
@@ -225,3 +394,24 @@ The resulting binary can be copied to any compatible machine and run directly:
 Environment variables:
 - `DATABASE_URL` — SQLite connection string (default: `sqlite:scanner.db?mode=rwc`)
 - `LISTEN_ADDR` — Bind address (default: `0.0.0.0:3000`)
+
+### Mobile (Android APK)
+
+The mobile deployment produces an **Android APK** containing the React Native app and the embedded `libmobile_backend.so`.
+
+Build script: `build-mobile.sh`
+1. Build Rust: `cargo build --target aarch64-linux-android -p mobile-backend --release`
+2. Copy `libmobile_backend.so` to `mobile/android/app/src/main/jniLibs/arm64-v8a/`
+3. Build APK: `cd mobile && npx react-native build-android --mode=release`
+
+The resulting APK runs entirely on-device — no server needed. Requires a **rooted Android device** for full functionality.
+
+## Implementation Roadmap Reference
+
+See `implementation_roadmap.md` for the detailed phased plan:
+1. **Phase 1**: Split Rust backend into Cargo workspace (core + web-backend)
+2. **Phase 2**: Define core's public facade API for mobile consumption
+3. **Phase 3**: Create mobile-backend JNI bridge crate
+4. **Phase 4**: Build React Native Android app
+5. **Phase 5**: Root access integration
+6. **Phase 6**: Build pipeline & packaging
