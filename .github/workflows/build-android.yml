@@ -1,22 +1,6 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - 'crates/core/**'
-      - 'crates/mobile-backend/**'
-      - 'mobile/**'
-      - 'migrations/**'
-      - '.github/workflows/build-android.yml'
-  pull_request:
-    branches: [main, master]
-    paths:
-      - 'crates/core/**'
-      - 'crates/mobile-backend/**'
-      - 'mobile/**'
-      - 'migrations/**'
-      - '.github/workflows/build-android.yml'
   workflow_dispatch:
 
 env:

@@ -1,22 +1,6 @@
 name: Build Web
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - 'crates/core/**'
-      - 'crates/web-backend/**'
-      - 'frontend/**'
-      - 'migrations/**'
-      - '.github/workflows/build-web.yml'
-  pull_request:
-    branches: [main, master]
-    paths:
-      - 'crates/core/**'
-      - 'crates/web-backend/**'
-      - 'frontend/**'
-      - 'migrations/**'
-      - '.github/workflows/build-web.yml'
   workflow_dispatch:
 
 env:
