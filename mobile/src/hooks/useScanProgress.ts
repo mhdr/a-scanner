@@ -58,8 +58,9 @@ export function useScanProgress(
           };
         });
 
-        // Final fetch on terminal status
+        // Final fetch on terminal status — reset to page 0 for a full fresh load
         if (event.status === 'completed' || event.status === 'failed' || event.status === 'stopped') {
+          useScanStore.getState().setResultsPagination(0, useScanStore.getState().resultsPageSize);
           fetchScan(scanId);
           fetchScanResults(scanId);
         }

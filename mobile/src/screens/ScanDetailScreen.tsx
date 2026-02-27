@@ -51,18 +51,22 @@ export default function ScanDetailScreen({ route, navigation }: Props) {
   } = useScanStore();
 
   const refreshData = useCallback(() => {
+    // Reset to first page on refresh so results start fresh
+    setResultsPagination(0, resultsPageSize);
     fetchScan(scanId);
     fetchScanResults(scanId);
-  }, [scanId, fetchScan, fetchScanResults]);
+  }, [scanId, fetchScan, fetchScanResults, setResultsPagination, resultsPageSize]);
 
   // Initial fetch
   useEffect(() => {
     refreshData();
   }, [refreshData]);
 
-  // Re-fetch results on pagination change
+  // Fetch next page of results on "Load More" (skip page 0 — handled by refreshData)
   useEffect(() => {
-    fetchScanResults(scanId);
+    if (resultsPage > 0) {
+      fetchScanResults(scanId);
+    }
   }, [scanId, resultsPage, resultsPageSize, fetchScanResults]);
 
   // Real-time progress via polling

@@ -42,7 +42,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   currentResults: [],
   resultsTotal: 0,
   resultsPage: 0,
-  resultsPageSize: 25,
+  resultsPageSize: 100,
   isScansLoading: false,
   isScanLoading: false,
   isResultsLoading: false,
@@ -84,12 +84,17 @@ export const useScanStore = create<ScanState>((set, get) => ({
   },
 
   fetchScanResults: async (id: string, silent = false) => {
-    const { resultsPage, resultsPageSize } = get();
+    const { resultsPage, resultsPageSize, currentResults } = get();
     if (!silent) set({ isResultsLoading: true, error: null });
     try {
       const resp = await bridge.getScanResults(id, resultsPage + 1, resultsPageSize);
+      // Append when loading subsequent pages (infinite scroll), replace on first page
+      const updatedResults =
+        resultsPage > 0
+          ? [...currentResults, ...resp.data]
+          : resp.data;
       set({
-        currentResults: resp.data,
+        currentResults: updatedResults,
         resultsTotal: resp.total,
         isResultsLoading: false,
       });
