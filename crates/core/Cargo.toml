@@ -42,7 +42,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Networking / scanning
 ipnet = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-rustls = "0.23"
+rustls = { version = "0.23", features = ["ring"] }
 tokio-rustls = "0.26"
 webpki-roots = "0.26"
 futures = "0.3"

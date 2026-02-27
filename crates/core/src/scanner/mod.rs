@@ -128,6 +128,12 @@ pub trait CdnProvider: Send + Sync {
 
 /// Create a TLS connector with webpki root certificates.
 pub fn create_tls_connector() -> TlsConnector {
+    // Ensure the ring crypto provider is installed as the process-level default.
+    // On Android (cross-compiled), rustls cannot auto-detect the provider from
+    // crate features, so we install it explicitly.  The call is idempotent — it
+    // returns Err if a provider is already installed, which we ignore.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let root_store =
         rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
